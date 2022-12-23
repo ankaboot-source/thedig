@@ -11,3 +11,4 @@ thefuzz[speedup]>=0.19
 celery[redis]>=5.2.7
 loguru>=0.6.0
 pre-commit
+setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
