@@ -38,6 +38,7 @@ api_key_header_auth = APIKeyHeader(
     description="Mandatory API Token, required for all endpoints",
 )
 
+
 async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
     if not any(
         secrets.compare_digest(api_key_header, api_key_v)

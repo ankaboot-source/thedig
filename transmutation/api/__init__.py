@@ -1,3 +1,5 @@
+from .tasks import celery_tasks
+
 __license__ = "AGPL"
 __author__ = "Badreddine Lejmi <badreddine@ankaboot.fr>"
 __version__ = "0.1dev"
@@ -18,6 +20,5 @@ router.include_router(whoiscompany_router)
 router.include_router(linkedin_router)
 router.include_router(transmuter_router)
 
-from .tasks import celery_tasks
 
 __all__ = ("celery_tasks",)

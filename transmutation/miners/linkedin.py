@@ -14,21 +14,27 @@ except ImportError:
 
 import re
 import threading
+
 # needed for memory sharing between threads
 from multiprocessing.sharedctypes import Value
 
 import requests
+
 # log
 from loguru import logger as log
 from pydantic_schemaorg.Organization import Organization
+
 # JSON Schema.org types
 from pydantic_schemaorg.Person import Person
 from pydantic_schemaorg.PostalAddress import PostalAddress
+
 # Fuzzy string match for person name identification
 from thefuzz import fuzz
 
 # linkedin profile url with an ISO3166 country code regular expression
-LINKEDIN_URL_RE = re.compile(r"https:\/\/(?P<countrycode>\w{2})\.?linkedin.com\/in\/(?P<nickname>w)*")
+LINKEDIN_URL_RE = re.compile(
+    r"https:\/\/(?P<countrycode>\w{2})\.?linkedin.com\/in\/(?P<nickname>w)*"
+)
 
 
 def country_from_url(linkedin_url: str) -> str:
@@ -114,11 +120,13 @@ class LinkedInSearch:
 
         if bing:
             self.bing = True
-            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
+            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(
+                **search_api_params)
             log.debug("Build Bing search URL : " + self.bing_search_url)
 
         if not bing and not google:
-            raise ValueError("Must choose at least one search engine: bing or google")
+            raise ValueError(
+                "Must choose at least one search engine: bing or google")
 
         if bulk:
             self.persons = []
@@ -233,7 +241,8 @@ class LinkedInSearch:
         )
 
         if result:
-            full_title = parse_linkedin_title(result["title" if google else "name"])
+            full_title = parse_linkedin_title(
+                result["title" if google else "name"])
 
             # the full name from the result must be the same that the name itself
             # 96 seems a good ratio for difference between ascii and latin characters
@@ -247,7 +256,8 @@ class LinkedInSearch:
             if "title" in full_title:
                 self.person.jobTitle = full_title["title"]
             if "company" in full_title:
-                self.person.worksFor = Organization(name=full_title.get("company"))
+                self.person.worksFor = Organization(
+                    name=full_title.get("company"))
 
             try:
                 if google:
@@ -277,7 +287,8 @@ class LinkedInSearch:
                 google = threading.Thread(
                     target=self.extract_google, args=(name, email)
                 )
-                bing = threading.Thread(target=self.extract_bing, args=(name, email))
+                bing = threading.Thread(
+                    target=self.extract_bing, args=(name, email))
 
                 # starting threads
                 google.start()
