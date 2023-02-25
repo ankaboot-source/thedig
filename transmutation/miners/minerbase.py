@@ -9,15 +9,15 @@ __license__ = "AGPL"
 from collections import OrderedDict
 from pydantic_schemaorg.Person import Person
 
-class BaseAlchemist:
 
+class BaseAlchemist:
     _ordered_mining_fields = (
-            'url',
-            'sameAs',
-            'email',
-            'image',
-            'sameAs',
-            )
+        "url",
+        "sameAs",
+        "email",
+        "image",
+        "sameAs",
+    )
 
     @classmethod
     def from_keys(cls, **fields):
@@ -26,22 +26,23 @@ class BaseAlchemist:
     def __init__(self, person):
         self.person = person
         self._init_miners()
-        
+
     def _init_miners(self):
-        self.fields_miner = OrderedDict({
-            k:[] for k in self._ordered_mining_fields
-        })
+        self.fields_miner = OrderedDict(
+            {k: [] for k in self._ordered_mining_fields})
 
     def mine(self):
         for field in self._ordered_mining_fields:
             for miner in self.fields_miner[field]:
                 miner(self)
-    
+
     def dict(self):
         ...
 
+
 if __name__ == "__main__":
     from loguru import logger as log
+
     p = Person(name="Khalil LEJMI")
     b = BaseMiner.from_keys(name="Khalil LEJMI")
     b.mine()

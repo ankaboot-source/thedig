@@ -14,23 +14,30 @@ except ImportError:
 
 import re
 import threading
+
 # needed for memory sharing between threads
 from multiprocessing.sharedctypes import Value
 
 from pydantic import AnyHttpUrl
 
 import requests
+
 # log
 from loguru import logger as log
 from pydantic_schemaorg.Organization import Organization
+
 # JSON Schema.org types
 from pydantic_schemaorg.Person import Person
 from pydantic_schemaorg.PostalAddress import PostalAddress
+
 # Fuzzy string match for person name identification
 from thefuzz import fuzz
 
 # linkedin profile url with an ISO3166 country code regular expression
-LINKEDIN_URL_RE = re.compile(r"https:\/\/(?P<countrycode>\w{2})?(www)?\.?linkedin\.com\/in\/(?P<identifier>\w+)")
+LINKEDIN_URL_RE = re.compile(
+    r"https:\/\/(?P<countrycode>\w{2})?(www)?\.?linkedin\.com\/in\/(?P<identifier>\w+)"
+)
+
 
 def url_to_socialprofile(url: AnyHttpUrl) -> tuple:
     """Extract from an url a social network profile
@@ -39,13 +46,13 @@ def url_to_socialprofile(url: AnyHttpUrl) -> tuple:
         url (AnyHttpUrl): social network profile url
 
     Returns:
-        socialnetwork, identifier: social network domain, identifier on this social network 
+        socialnetwork, identifier: social network domain, identifier on this social network
     """
     socialnetwork, identifier = None, None
     url_matched = re.match(SOCIALPROFILE_RE, url)
     if url_matched:
-        socialnetwork = url_matched.groupdict()['socialnetwork']
-        identifier = url_matched.groupdict()['identifier']
+        socialnetwork = url_matched.groupdict()["socialnetwork"]
+        identifier = url_matched.groupdict()["identifier"]
     return socialnetwork, identifier
 
 
@@ -61,7 +68,7 @@ def country_from_url(linkedin_url: str) -> str:
     """
     match = LINKEDIN_URL_RE.match(linkedin_url)
 
-    if match and match['countrycode']:
+    if match and match["countrycode"]:
         return ISO3166[match["countrycode"].upper()]
 
 
@@ -92,7 +99,7 @@ class LinkedInSearch:
     """
 
     NUM_RESULTS = 10
-    
+
     # either q or exactTerms (don't work for emails)
     QUERY_TYPE = "q"
     GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image)"
@@ -137,11 +144,13 @@ class LinkedInSearch:
 
         if bing:
             self.bing = True
-            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
+            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(
+                **search_api_params)
             log.debug("Build Bing search URL : " + self.bing_search_url)
 
         if not bing and not google:
-            raise ValueError("Must choose at least one search engine: bing or google")
+            raise ValueError(
+                "Must choose at least one search engine: bing or google")
 
         if bulk:
             self.persons = []
@@ -233,29 +242,28 @@ class LinkedInSearch:
         self.person.url = result["link"]
 
     def _result_to_dict(self, result) -> dict:
-
         # build initial dict
         person_d = {
-            'givenName': result["pagemap"]["metatags"][0]["profile:first_name"],
-            'familyName': result["pagemap"]["metatags"][0]["profile:last_name"], 
-            'url': result["link"],
-            'identifier': re.match(LINKEDIN_URL_RE, result['link'])['identifier'],
+            "givenName": result["pagemap"]["metatags"][0]["profile:first_name"],
+            "familyName": result["pagemap"]["metatags"][0]["profile:last_name"],
+            "url": result["link"],
+            "identifier": re.match(LINKEDIN_URL_RE, result["link"])["identifier"],
         }
-        person_d['name'] = f"{person_d['givenName']} {person_d['familyName']}"
+        person_d["name"] = f"{person_d['givenName']} {person_d['familyName']}"
 
         # enrich with parsed from linkedin title
         full_title = parse_linkedin_title(result["title"])
         # the parsing worked only if name parsed is the same
-        if full_title['name'] == person_d['name']:
+        if full_title["name"] == person_d["name"]:
             person_d.update(full_title)
-        
+
         # add the image, yet
         # we do not use cse_thumbnail (Google's image)
         if len(result["pagemap"]["metatags"]) >= 1:
-            person_d['image'] = result["pagemap"]["metatags"][0]["og:image"]
+            person_d["image"] = result["pagemap"]["metatags"][0]["og:image"]
 
         return person_d
-    
+
     def extract(
         self, name: str, email: str = None, company: str = None, google: bool = True
     ) -> Person:
@@ -290,8 +298,9 @@ class LinkedInSearch:
         persons_d = {}
         for r in results:
             # must be a valid profile link
-            if not re.match(LINKEDIN_URL_RE, r['link']):
-                log.debug(f"This url isn't a valid Linkedin Profile {r['link']}")
+            if not re.match(LINKEDIN_URL_RE, r["link"]):
+                log.debug(
+                    f"This url isn't a valid Linkedin Profile {r['link']}")
                 continue
 
             person_d = self._result_to_dict(r)
@@ -307,14 +316,14 @@ class LinkedInSearch:
 
             # check homonymous
             if name in persons_d:
-                return None            
+                return None
 
             persons_d[name] = person_d
-        
+
         # not found, bye
         if name not in persons_d:
             return None
-        
+
         persons_d[name].update(self.person.dict())
         self.person = Person(**persons_d[name])
         if self.person.worksFor:
@@ -336,7 +345,8 @@ class LinkedInSearch:
                 google = threading.Thread(
                     target=self.extract_google, args=(name, email)
                 )
-                bing = threading.Thread(target=self.extract_bing, args=(name, email))
+                bing = threading.Thread(
+                    target=self.extract_bing, args=(name, email))
 
                 # starting threads
                 google.start()

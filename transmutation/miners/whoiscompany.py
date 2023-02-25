@@ -41,6 +41,7 @@ def get_company(domain: str) -> str:
 
     return company
 
+
 def get_company_from_email(email: str) -> str:
     """return company name from an email address
 

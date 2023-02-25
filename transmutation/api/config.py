@@ -40,8 +40,8 @@ settings = Settings()
 
 if not settings.public_email_providers:
     settings.public_email_providers = set(
-            get(settings.public_email_providers_url).json()
-            )
+        get(settings.public_email_providers_url).json()
+    )
 
 # build connection string for redis
 redis_credentials = ""

@@ -15,17 +15,15 @@ class Alchemist:
     """Enrich iteratively persons using miners"""
 
     _ordered_elements = {
-            'url',
-            'sameAs',
-            'email',
-            'image',
+        "url",
+        "sameAs",
+        "email",
+        "image",
     }
 
     def __init__(self):
         self.elements = set()
-        self.miners = OrderedDict({
-            k: [] for k in self._ordered_elements
-        })
+        self.miners = OrderedDict({k: [] for k in self._ordered_elements})
 
     async def transmute_person(self, person: Person) -> tuple[bool, Person]:
         """Transmute one person
@@ -79,11 +77,7 @@ class Alchemist:
         async for person in persons:
             yield self.transmute_person(person)
 
-    async def transmute(
-            self,
-            person: Person = None,
-            persons: list[Person] = None
-            ):
+    async def transmute(self, person: Person = None, persons: list[Person] = None):
         if person:
             return await self.transmute_person(person)
         elif persons:
@@ -96,4 +90,5 @@ class Alchemist:
                 self.miners[element].append(miner_func)
                 self.elements.add(element)
             return miner_func
+
         return decorator

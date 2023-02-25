@@ -87,7 +87,6 @@ async def linkedin_callback(
     x_callback_endpoint: str = Header(),
     x_callback_secret: SecretStr = Header(),
 ) -> str:
-
     # remove persons with no name
     # persons = list(filter(lambda p: p.name, persons))
     persons = [p.dict(exclude_unset=True) for p in persons if p.name]
@@ -99,7 +98,8 @@ async def linkedin_callback(
         "Prefer": "resolution=merge-duplicates",
         "Content-type": "application/json",
     }
-    callback_params = {"endpoint": x_callback_endpoint, "headers": callback_headers}
+    callback_params = {"endpoint": x_callback_endpoint,
+                       "headers": callback_headers}
 
     # background.add_task(patch_personDB, x_callback_endpoint, callback_headers, persons)
     miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
