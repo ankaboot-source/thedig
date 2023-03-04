@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: 	AGPL-3.0-or-later
 
 """LinkedIn Miner API"""
+import redis
+
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -42,7 +44,6 @@ search_api_params = {
 }
 
 # redis for cache
-import redis
 
 # init cache for whois
 redis_param = {
@@ -55,9 +56,11 @@ redis_param["decode_responses"] = True
 cache = redis.Redis(**redis_param)
 log.info("Set-up Redis cache for whoiscompany")
 
-@router.get("/transmute/{email}", response_model=Person, response_model_exclude_none=True)
-def transmute_one(email: EmailStr, name: str) -> Person:
 
+@router.get(
+    "/transmute/{email}", response_model=Person, response_model_exclude_none=True
+)
+def transmute_one(email: EmailStr, name: str) -> Person:
     # first, let's find him on LinkedIn
     miner = LinkedInSearch(search_api_params)
     person = miner.search(name=name, email=email)
@@ -90,21 +93,24 @@ def transmute_one(email: EmailStr, name: str) -> Person:
             if not company:
                 company = get_company(domain)
                 # redis refuse to store None so we'll use a void string instead
-                # we won't check for this domain again for some time 
-                cache.set(domain, company or '', ex=settings.cache_expiration)
+                # we won't check for this domain again for some time
+                cache.set(domain, company or "", ex=settings.cache_expiration)
             if company:
                 person.worksFor = company
 
     return person
 
+
 al = Alchemist()
+
+
 @al.register(element="email")
 async def miner_gravatar(p: Person):
     status = False
     avatar = gravatar(p.email)
     if avatar:
         status = True
-    return status, {'image': avatar}
+    return status, {"image": avatar}
 
 
 class WebSocketManager:
@@ -125,11 +131,14 @@ class WebSocketManager:
         for connection in self.connections:
             await connection.send_text(message)
 
+
 wss_manager = WebSocketManager()
 
 
 @router.websocket("/transmute/websocket")
-async def websocket_endpoint(websocket: WebSocket, token: str = Depends(websocket_api_key)):
+async def websocket_endpoint(
+    websocket: WebSocket, token: str = Depends(websocket_api_key)
+):
     await wss_manager.connect(websocket)
     log.debug(f"Websocket connected: {websocket}")
     try:
@@ -154,6 +163,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Depends(websocke
     except WebSocketDisconnect:
         log.debug(f"Websocket {websocket} disconnected")
         wss_manager.disconnect(websocket)
+
 
 # @router.post("/transmute", response_model=list[Person], response_model_exclude_none=True)
 # def transmute_many(self):
