@@ -1,4 +1,6 @@
 """Whois Company Miner API"""
+import redis
+
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -21,7 +23,6 @@ from loguru import logger as log
 router = APIRouter()
 
 # redis for cache
-import redis
 
 redis_param = settings.redis_parameters
 redis_param["db"] = settings.cache_redis_db
@@ -42,7 +43,7 @@ def whois_unique(domain: str) -> str:
     """
     if domain in settings.public_email_providers:
         return None
-    
+
     company = cache.get(domain)
     if company:
         log.debug("Cache found for domain: %s" % domain)

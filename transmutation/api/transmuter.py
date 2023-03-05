@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: 	AGPL-3.0-or-later
 
 """LinkedIn Miner API"""
+import redis
+
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -43,7 +45,6 @@ search_api_params = {
 }
 
 # redis for cache
-import redis
 
 # init cache for whois
 redis_param = {
@@ -56,9 +57,11 @@ redis_param["decode_responses"] = True
 cache = redis.Redis(**redis_param)
 log.info("Set-up Redis cache for whoiscompany")
 
-@router.get("/transmute/{email}", response_model=Person, response_model_exclude_none=True)
-def transmute_one(email: EmailStr, name: str) -> Person:
 
+@router.get(
+    "/transmute/{email}", response_model=Person, response_model_exclude_none=True
+)
+def transmute_one(email: EmailStr, name: str) -> Person:
     # first, let's find him on LinkedIn
     miner = LinkedInSearch(search_api_params)
     person = miner.search(name=name, email=email)
@@ -91,21 +94,24 @@ def transmute_one(email: EmailStr, name: str) -> Person:
             if not company:
                 company = get_company(domain)
                 # redis refuse to store None so we'll use a void string instead
-                # we won't check for this domain again for some time 
-                cache.set(domain, company or '', ex=settings.cache_expiration)
+                # we won't check for this domain again for some time
+                cache.set(domain, company or "", ex=settings.cache_expiration)
             if company:
                 person.worksFor = company
 
     return person
 
+
 al = Alchemist()
+
+
 @al.register(element="email")
 async def miner_gravatar(p: Person):
     status = False
     avatar = gravatar(p.email)
     if avatar:
         status = True
-    return status, {'image': avatar}
+    return status, {"image": avatar}
 
 
 class WebSocketManager:
@@ -126,10 +132,14 @@ class WebSocketManager:
         for connection in self.connections:
             await connection.send_text(message)
 
+
 wss_manager = WebSocketManager()
 
+
 @router.websocket("/transmute/{user_id}/websocket")
-async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Depends(websocket_api_key)):
+async def websocket_endpoint(
+    websocket: WebSocket, user_id: int, token: str = Depends(websocket_api_key)
+):
     await wss_manager.connect(websocket)
     transmuted_count = 0
     log.debug(f"Websocket connected: {websocket}")
@@ -137,11 +147,15 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
         while transmuted_count < settings.persons_bulk_max:
             # Wait for any message from the client
             person_data = await websocket.receive_json()
-            if type(person_data) is dict and 'email' in person_data and 'name' in person_data:
+            if (
+                type(person_data) is dict
+                and "email" in person_data
+                and "name" in person_data
+            ):
                 person = Person(**person_data)
             else:
                 log.debug(f"invalid data: {person_data} - {type(person_data)}")
-                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)     
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
             # Send message to the client
             mining_status, person = await al.transmute_person(person)
             if not mining_status:
@@ -150,7 +164,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
                 transmuted_count += 1
             await websocket.send_text(person.json())
         # reached bulk limit
-        log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
+        log.debug(
+            f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
         raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)
     except WebSocketDisconnect:
         log.debug(f"Websocket disconnected: {websocket}")
