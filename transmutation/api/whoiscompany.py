@@ -23,6 +23,7 @@ router = APIRouter()
 
 cache = setup_cache(settings, settings.cache_redis_db)
 
+
 @router.get("/whoiscompany/{domain}")
 def whois_unique(domain: str) -> str:
     """Give company name based on the domain's owner
@@ -35,7 +36,7 @@ def whois_unique(domain: str) -> str:
     """
     if domain in settings.public_email_providers:
         return None
-    
+
     company = cache.get(domain)
     if company:
         log.debug("Cache found for domain: %s" % domain)

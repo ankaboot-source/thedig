@@ -49,9 +49,11 @@ search_api_params = {
 # init cache for transmuter
 cache = setup_cache(settings, 7)
 
-@router.get("/transmute/{email}", response_model=Person, response_model_exclude_none=True)
-def transmute_one(email: EmailStr, name: str) -> Person:
 
+@router.get(
+    "/transmute/{email}", response_model=Person, response_model_exclude_none=True
+)
+def transmute_one(email: EmailStr, name: str) -> Person:
     # first, let's find him on LinkedIn
     miner = LinkedInSearch(search_api_params)
     person = miner.search(name=name, email=email)
@@ -84,20 +86,23 @@ def transmute_one(email: EmailStr, name: str) -> Person:
             if not company:
                 company = get_company(domain)
                 # redis refuse to store None so we'll use a void string instead
-                # we won't check for this domain again for some time 
-                cache.set(domain, company or '', ex=settings.cache_expiration)
+                # we won't check for this domain again for some time
+                cache.set(domain, company or "", ex=settings.cache_expiration)
             if company:
                 person.worksFor = company
 
     return person
 
+
 al = Alchemist()
+
+
 @al.register(element="email")
 async def miner_gravatar(p: Person):
     p_new = {}
     avatar = gravatar(p.email)
     if avatar:
-        p_new['image'] = avatar
+        p_new["image"] = avatar
     return p_new
 
 
@@ -119,10 +124,14 @@ class WebSocketManager:
         for connection in self.connections:
             await connection.send_text(message)
 
+
 wss_manager = WebSocketManager()
 
+
 @router.websocket("/transmute/{user_id}/websocket")
-async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Depends(websocket_api_key)):
+async def websocket_endpoint(
+    websocket: WebSocket, user_id: int, token: str = Depends(websocket_api_key)
+):
     await wss_manager.connect(websocket)
     transmuted_count = 0
     log.debug(f"Websocket connected: {websocket}")
@@ -136,12 +145,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
             mining_status = None
 
             # data validation
-            if type(person_data) is dict and 'email' in person_data and 'name' in person_data:
+            if (
+                type(person_data) is dict
+                and "email" in person_data
+                and "name" in person_data
+            ):
                 person = Person(**person_data)
             else:
                 log.debug(f"invalid data: {person_data} - {type(person_data)}")
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
-               
+
             person_c = cache.get(f"{user_id}-{person.email}")
             person_c = None
             if person_c:
@@ -152,12 +165,17 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
                 await aqueue.put(person)
                 al_status, transmuted = await al.person(await aqueue.get())
                 if al_status:
-                    cache.set(f"{user_id}-{person.email}", transmuted.json(), ex=settings.cache_expiration)
+                    cache.set(
+                        f"{user_id}-{person.email}",
+                        transmuted.json(),
+                        ex=settings.cache_expiration,
+                    )
                     transmuted_count += 1
             # Send message to the client
             await websocket.send_text(f"[{al_status}, {transmuted.json()}]")
         # reached bulk limit
-        log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
+        log.debug(
+            f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
         raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)
     except WebSocketDisconnect:
         log.debug(f"Websocket disconnected: {websocket}")
