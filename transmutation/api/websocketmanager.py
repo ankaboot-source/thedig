@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: 	AGPL-3.0-or-later
 
 from fastapi import WebSocket
+
+
 class WebSocketManager:
     def __init__(self):
         self.connections: Set[WebSocket] = set()
@@ -19,5 +21,6 @@ class WebSocketManager:
     async def broadcast(self, message: str):
         for connection in self.connections:
             await connection.send_text(message)
+
 
 manager = WebSocketManager()
