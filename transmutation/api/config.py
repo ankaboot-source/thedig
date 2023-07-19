@@ -43,10 +43,9 @@ settings = Settings()
 
 if not settings.public_email_providers:
     try:
-        public_email_providers = get(settings.public_email_providers_url).json()
-        settings.public_email_providers = set(
-            public_email_providers
-            )
+        public_email_providers = get(
+            settings.public_email_providers_url).json()
+        settings.public_email_providers = set(public_email_providers)
     except ConnectionError as e:
         log.info(f"Impossible to GET public_email_providers_url: {e}")
 
@@ -72,6 +71,7 @@ def setup_cache(settings: Settings, db: int) -> Redis:
     cache = Redis(**redis_parameters)
     log.info(f"Set-up Redis cache for {db}")
     return cache
+
 
 # build connection string for redis
 redis_credentials = ""

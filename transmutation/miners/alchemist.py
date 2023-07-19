@@ -15,17 +15,15 @@ class Alchemist:
     """Enrich iteratively persons using miners"""
 
     _ordered_elements = {
-            'url',
-            'sameAs',
-            'email',
-            'image',
+        "url",
+        "sameAs",
+        "email",
+        "image",
     }
 
     def __init__(self):
         self.elements = set()
-        self.miners = OrderedDict({
-            k: [] for k in self._ordered_elements
-        })
+        self.miners = OrderedDict({k: [] for k in self._ordered_elements})
 
     async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
@@ -52,7 +50,7 @@ class Alchemist:
 
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
-                p_mined = await miner['func'](p_new)
+                p_mined = await miner["func"](p_new)
                 if p_mined:
                     log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
 
@@ -60,15 +58,18 @@ class Alchemist:
                         modified = True
 
                     # identify eligible new / existing keys
-                    new_keys = set([k for k in p_mined if p_mined[k] != p_new.get(k)]) & self.elements
+                    new_keys = (
+                        set([k for k in p_mined if p_mined[k] != p_new.get(k)])
+                        & self.elements
+                    )
                     existing_keys = p_mined.keys() & p_new.keys() & self.elements
-                    found = p_mined.keys() & miner['elements']
+                    found = p_mined.keys() & miner["elements"]
 
                     # add new keys to current mining
                     if new_keys:
                         elements.extend(list(new_keys))
 
-                    # update or add 
+                    # update or add
                     for k in new_keys:
                         p_new[k] = p_mined[k]
                     for k in existing_keys:
@@ -98,13 +99,13 @@ class Alchemist:
         Returns:
             function: miner
         """
+
         def decorator(miner_func):
             if element in self._ordered_elements:
                 log.debug(f"add {miner_func} to miners for {element}")
-                self.miners[element].append({
-                    'func': miner_func,
-                    'elements': output
-                     })
+                self.miners[element].append(
+                    {"func": miner_func, "elements": output})
                 self.elements.add(element)
             return miner_func
+
         return decorator

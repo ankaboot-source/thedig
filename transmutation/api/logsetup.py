@@ -93,7 +93,8 @@ try:
 
             # Configure logger before gunicorn starts logging
             logger.configure(
-                handlers=[{"sink": sys.stdout, "level": log_settings.log_level}]
+                handlers=[{"sink": sys.stdout,
+                           "level": log_settings.log_level}]
             )
 
 except:
