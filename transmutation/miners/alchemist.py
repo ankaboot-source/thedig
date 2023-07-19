@@ -15,17 +15,15 @@ class Alchemist:
     """Enrich iteratively persons using miners"""
 
     _ordered_elements = {
-            'url',
-            'sameAs',
-            'email',
-            'image',
+        "url",
+        "sameAs",
+        "email",
+        "image",
     }
 
     def __init__(self):
         self.elements = set()
-        self.miners = OrderedDict({
-            k: [] for k in self._ordered_elements
-        })
+        self.miners = OrderedDict({k: [] for k in self._ordered_elements})
 
     async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
@@ -51,7 +49,7 @@ class Alchemist:
 
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
-                p_mined = await miner['func'](person)
+                p_mined = await miner["func"](person)
                 if p_mined:
                     log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
 
@@ -60,13 +58,12 @@ class Alchemist:
 
                     for k, v in p_mined.items():
                         # eligibility to update
-                        if k in miner['output']:
+                        if k in miner["output"]:
                             person[k] = v
                             # eligibility to mine
                             if k in self.elements:
-                                elements.append(k)  
-                                                  
-                    
+                                elements.append(k)
+
         return modified, person
 
     async def bulk(self, persons: list[dict]):
@@ -81,7 +78,7 @@ class Alchemist:
         for person in persons:
             yield self.person(person)
 
-    def register(self, element: str, output: tuple|str):
+    def register(self, element: str, output: tuple | str):
         """register a function as a miner for an element field
 
         Args:
@@ -91,13 +88,17 @@ class Alchemist:
         Returns:
             function: miner
         """
+
         def decorator(miner_func):
             if element in self._ordered_elements:
                 log.debug(f"add {miner_func} to miners for {element}")
-                self.miners[element].append({
-                    'func': miner_func,
-                    'output': output if type(output) is tuple else (output,)
-                     })
+                self.miners[element].append(
+                    {
+                        "func": miner_func,
+                        "output": output if type(output) is tuple else (output,),
+                    }
+                )
                 self.elements.add(element)
             return miner_func
+
         return decorator
