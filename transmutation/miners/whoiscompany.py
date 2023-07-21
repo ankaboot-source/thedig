@@ -19,6 +19,7 @@ TO_IGNORE = (
 
 log = logging.getLogger(__name__)
 
+
 def get_domain(email: str) -> str:
     return email.split("@")[1]
 
@@ -29,7 +30,7 @@ def get_company(domain: str) -> str:
     except whois.exceptions.WhoisPrivateRegistry as e:
         log.debug(f"Whois failed: {e}")
         return None
-    
+
     # if the whois request does answer a proper string
     if not result:
         return None
@@ -43,6 +44,7 @@ def get_company(domain: str) -> str:
         return None
 
     return company
+
 
 def get_company_from_email(email: str) -> str:
     """return company name from an email address
