@@ -10,6 +10,7 @@ __license__ = "AGPL"
 import re
 import logging
 from contextlib import suppress
+
 # import spacy
 # import xx_ent_wiki_sm
 
@@ -118,11 +119,11 @@ RE_WHITESPACE = re.compile(r"\s+")
 RE_ALPHA = re.compile(r"\b[^\W\d_]+\b")
 
 BUSINESS_SEPARATOR = {
-    'from',
-    'van',
-    'von',
-    'de',
-    'd',
+    "from",
+    "van",
+    "von",
+    "de",
+    "d",
 }
 
 
@@ -130,12 +131,12 @@ def order(firstname: str, familyname: str) -> dict:
     # FAMILY NAME First Name (reversed)
     if firstname.isupper() and not familyname.isupper():
         return {
-            'familyname': firstname,
-            'firstname': familyname,
+            "familyname": firstname,
+            "firstname": familyname,
         }
     return {
-       'familyname': familyname,
-       'firstname': firstname,
+        "familyname": familyname,
+        "firstname": firstname,
     }
 
 
@@ -144,23 +145,19 @@ def is_company(name: str, domain: str) -> bool:
         if name.startswith(sep):
             name = name.removeprefix(sep)
             break
-        
-    _name = name.encode(
-        "ASCII", "ignore"
-        ).strip().lower().decode().replace(' ', '')
 
-    return _name in (
-            domain.split('.')[-2],
-            domain, 
-            '.'.join(domain.split('.')[-2:])
-            )
+    _name = name.encode("ASCII", "ignore").strip(
+    ).lower().decode().replace(" ", "")
+
+    return _name in (domain.split(".")[-2], domain, ".".join(domain.split(".")[-2:]))
 
 
 # def is_organization(familyname: str) -> bool:
 #    return any(
-#        map(lambda e: e.label_ == "ORG", 
+#        map(lambda e: e.label_ == "ORG",
 #        nlp(familyname).ents
 #        ))
+
 
 def _split_fullname(fullname: str) -> dict:
     # needs to look like a word somehow
@@ -168,26 +165,26 @@ def _split_fullname(fullname: str) -> dict:
         return None
 
     # minimum to guess length is 4
-    # needs a space somewhere in between    
-    if len(fullname) < 4 or ' ' not in fullname.strip():
+    # needs a space somewhere in between
+    if len(fullname) < 4 or " " not in fullname.strip():
         log.debug("Too short or only one word")
         return {
-            'firstname': fullname,
-            'familyname': None,
+            "firstname": fullname,
+            "familyname": None,
         }
 
     # e.g FAMILY NAME, First Name
-    comma_format = fullname.split(',')
+    comma_format = fullname.split(",")
     if len(comma_format) == 2 and comma_format[0].isupper():
         log.debug("Comma format detected")
         return {
-            'familyname': comma_format[0],
-            'firstname': comma_format[1],
-            }
+            "familyname": comma_format[0],
+            "firstname": comma_format[1],
+        }
 
     # normalize white spaces then split into words
-    fullname = RE_WHITESPACE.sub(' ', fullname).strip()
-    words = fullname.split(' ')
+    fullname = RE_WHITESPACE.sub(" ", fullname).strip()
+    words = fullname.split(" ")
 
     # eg. Dr. First Name FamilyName
     jobtitle = None
@@ -202,56 +199,53 @@ def _split_fullname(fullname: str) -> dict:
     # e.g FirstName FamilyName
     if len(words) == 2:
         log.debug("Only two words")
-        return {**order(
-            words[0],
-            words[1]
-        ), **{'jobtitle' : jobtitle}
-        }
-        
+        return {**order(words[0], words[1]), **{"jobtitle": jobtitle}}
+
     # eg. First name FAMILY NAME (or the opposite)
     firstname = words[0]
     familyname = None
-    
+
     last_word_upper = words[-1].isupper()
     first_word_upper = words[0].isupper()
 
     if first_word_upper ^ last_word_upper:
         log.debug("One of words is uppercase")
         # trick to reverse test
-        isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(f)
+        isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(
+            f)
         for i in range(len(words)):
             if isfamily(words[i]):
                 break
-        firstname = ' '.join(words[:i])
-        familyname = ' '.join(words[i:])
+        firstname = " ".join(words[:i])
+        familyname = " ".join(words[i:])
         if first_word_upper:
             firstname, familyname = familyname, firstname
     else:
         # eg. First Name Van Family Name
-        for i in range(1, len(words)-1):
+        for i in range(1, len(words) - 1):
             if words[i].lower() in FAMILYNAME_SEPARATOR:
                 log.debug(f"Familyname separator found: {words[i]}")
-                firstname = ' '.join(words[:i])
-                familyname = ' '.join(words[i:])
+                firstname = " ".join(words[:i])
+                familyname = " ".join(words[i:])
                 break
 
     if firstname:
         return {
-                'firstname': firstname,
-                'familyname': familyname,
-  #               'familyname': familyname if is_organization(familyname) else None,
-                'jobtitle': jobtitle,
-            }
+            "firstname": firstname,
+            "familyname": familyname,
+            #               'familyname': familyname if is_organization(familyname) else None,
+            "jobtitle": jobtitle,
+        }
 
 
 def split_fullname(fullname: str, domain: str = None) -> dict:
     if is_company(fullname, domain):
         return None
-    
+
     splitted = _split_fullname(fullname)
     if not splitted:
         return None
-    
+
     for k, v in splitted.copy().items():
         if not v:
             splitted.pop(k)
@@ -262,22 +256,22 @@ def split_fullname(fullname: str, domain: str = None) -> dict:
         elif domain and is_company(v, domain):
             splitted.pop(k)
             log.debug(f"Company detected {v}:{domain}")
-    
-    return splitted if splitted.get('firstname') else None
+
+    return splitted if splitted.get("firstname") else None
 
 
 if __name__ == "__main__":
     import csv
     import argparse
-    
+
     parser = argparse.ArgumentParser(
-                prog='Fullname Splitter',
-                description='Split a fullname in a firstname and familyname')
+        prog="Fullname Splitter",
+        description="Split a fullname in a firstname and familyname",
+    )
     parser.add_argument("-f", "--file")
     parser.add_argument("-n", "--name")
     parser.add_argument("-e", "--email")
-    parser.add_argument("--debug", action='store_true')
-
+    parser.add_argument("--debug", action="store_true")
 
     args = parser.parse_args()
 
@@ -287,26 +281,20 @@ if __name__ == "__main__":
             level=logging.DEBUG,
         )
 
-
     if args.file:
-        with open(args.file, newline='', encoding='utf-8-sig') as csvfile:
+        with open(args.file, newline="", encoding="utf-8-sig") as csvfile:
             reader = csv.DictReader(
-                csvfile,
-                delimiter=',',
-                quotechar='"',
-                quoting=csv.QUOTE_ALL
-                )
+                csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL
+            )
             for row in reader:
-                if row.get('Name'):
+                if row.get("Name"):
                     s = split_fullname(
-                        row['Name'],
-                        row['Email'].split('@')[-1]
-                        )
+                        row["Name"], row["Email"].split("@")[-1])
                     if s:
                         print(f"{row['Name']}: {s} from {row['Email']}")
                     else:
                         print(f"{row['Name']}: None")
     elif args.name and args.email:
-        print(split_fullname(args.name, args.email.split('@')[1]))
+        print(split_fullname(args.name, args.email.split("@")[1]))
     else:
         print(split_fullname(args.name))

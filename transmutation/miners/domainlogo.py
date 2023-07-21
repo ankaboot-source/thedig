@@ -25,33 +25,35 @@ log = logging.getLogger(__name__)
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 
 COUNTRY_TLD_EXCLUSION = {
-    'io',
-    're',
-    'tv',
-    'sk',
-    'ly',
-    'in',
-    'me',
-    'sh',
-    'ws',
-    'ai',
-    'cc',
-    'bz',
-    'co',
-    'fm',
-    'im',
-    'to',
-    'am',
-    'it',
-    'at',
-    'mu',
-    'nu',
-    'is',
-    'tk',
+    "io",
+    "re",
+    "tv",
+    "sk",
+    "ly",
+    "in",
+    "me",
+    "sh",
+    "ws",
+    "ai",
+    "cc",
+    "bz",
+    "co",
+    "fm",
+    "im",
+    "to",
+    "am",
+    "it",
+    "at",
+    "mu",
+    "nu",
+    "is",
+    "tk",
 }
 
+
 def get_tld(domain: str) -> str:
-    return domain.split('.')[-1]
+    return domain.split(".")[-1]
+
 
 def guess_country(domain: str) -> str:
     tld = get_tld(domain)
@@ -59,6 +61,7 @@ def guess_country(domain: str) -> str:
     if tld in COUNTRY_TLD_EXCLUSION:
         return None
     return ISO3166.get(tld.upper())
+
 
 def domain_to_urls(domain: str) -> list[str]:
     """Build hypothetical websites URL from a domain
@@ -125,7 +128,8 @@ def scrap_favicon(url: str) -> str:
 
         favicon_link = soup.find("link", attrs={"rel": FAVICON_RE})
         if favicon_link:
-            log.debug("We did find the favicon link in the HTML: %s" % favicon_link)
+            log.debug("We did find the favicon link in the HTML: %s" %
+                      favicon_link)
             favicon_href = favicon_link.get("href")
             favicon_url = urllib.parse.urljoin(url, favicon_href)
         else:
