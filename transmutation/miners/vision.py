@@ -43,9 +43,9 @@ MAX_VISION_RESULTS = 20
 
 
 def find_pages_with_matching_images(
-        image_url: str,
-        max_results: Optional[int] = MAX_VISION_RESULTS,
-        ) -> set[str]:
+    image_url: str,
+    max_results: Optional[int] = MAX_VISION_RESULTS,
+) -> set[str]:
     """Find pages with matching images
 
     Args:
@@ -59,26 +59,33 @@ def find_pages_with_matching_images(
     """
     # search using google vision
     client = vision.ImageAnnotatorClient.from_service_account_file(
-            settings.google_vision_credentials
-            )
+        settings.google_vision_credentials
+    )
 
-    response = client.annotate_image({
-        'image': {'source': {'image_uri': image_url}},
-        'features': [{
-            'type_': vision.Feature.Type.WEB_DETECTION,
-            'max_results': max_results,
-            }]
-    })
+    response = client.annotate_image(
+        {
+            "image": {"source": {"image_uri": image_url}},
+            "features": [
+                {
+                    "type_": vision.Feature.Type.WEB_DETECTION,
+                    "max_results": max_results,
+                }
+            ],
+        }
+    )
     response = response.web_detection
 
     if hasattr(response, "error"):
         log.error(f"Image: {image_url}. Error: {response.error.message}")
         raise Exception(
-            '{}\nFor more info on error messages, check: '
-            'https://cloud.google.com/apis/design/errors'.format(
-                response.error.message))
+            "{}\nFor more info on error messages, check: "
+            "https://cloud.google.com/apis/design/errors".format(
+                response.error.message)
+        )
 
-    matching = [r for r in response.pages_with_matching_images if "full_matching_images" in r]
+    matching = [
+        r for r in response.pages_with_matching_images if "full_matching_images" in r
+    ]
     log.debug(f"Matching images found for {image_url}: {matching}")
 
     return matching
@@ -108,25 +115,28 @@ def is_valid_socialprofile(url, name, retry=0, max_retry=MAX_RETRY):
     #    params["proxies"] = rotating_proxy()
     #    params['proxies'] = {'http' : "https://localhost:8080"}
     #    log.info(f"Retry with proxy. Proxy: {params['proxies']}, URL: {url}")
-        
+
     try:
         r = requests.get(url, **params)
     except requests.exceptions.ProxyError as e:
         log.warning(f"Proxy error, let's retry. Params: {params}. Error {e}")
-        return is_valid_socialprofile(url, name, retry=retry+1)
+        return is_valid_socialprofile(url, name, retry=retry + 1)
     except requests.exceptions.ConnectTimeout:
         log.warning(f"Timeout error, let's retry. Params: {params}")
         if params.get("proxies"):
-            return is_valid_socialprofile(url, name, retry=retry+1)
+            return is_valid_socialprofile(url, name, retry=retry + 1)
         return None
     except requests.RequestException as e:
-        log.error(f"Failed trying to reach Social Network. URL: {url}, Error: {e}")
+        log.error(
+            f"Failed trying to reach Social Network. URL: {url}, Error: {e}")
         return None
 
     if not r.ok:
-        log.debug(f"Social Network profile not found. URL: {url}, Error: {r.status_code}")
+        log.debug(
+            f"Social Network profile not found. URL: {url}, Error: {r.status_code}"
+        )
         return False
-    
+
     soup = BeautifulSoup(r.text, "html.parser")
 
     # the title from the profile must contains the person's name itself
@@ -134,19 +144,23 @@ def is_valid_socialprofile(url, name, retry=0, max_retry=MAX_RETRY):
 
     # something went wrong with scrapping?
     if not title:
-        log.warning(f"No title, possible antibot tactic. URL: {url}, Headers: {params}, Content: {r.text}")
-        return is_valid_socialprofile(url, name, retry=retry+1)  
+        log.warning(
+            f"No title, possible antibot tactic. URL: {url}, Headers: {params}, Content: {r.text}"
+        )
+        return is_valid_socialprofile(url, name, retry=retry + 1)
 
     og_title = soup.find("meta", attrs={"property": "og:title"})
-    og_title = og_title['content'] if og_title else None
-    
+    og_title = og_title["content"] if og_title else None
+
     # 96 seems a good ratio for difference between ascii and latin characters
     # should do fine tuning here trained on a huge international dataset
     ratio_title = fuzz.partial_token_sort_ratio(name, title.string)
     ratio_ogtitle = fuzz.partial_token_sort_ratio(name, og_title)
-    title = title.string or og_title or ''
+    title = title.string or og_title or ""
     if ratio_title < TOKEN_RATIO and ratio_ogtitle < TOKEN_RATIO and name not in title:
-        log.debug(f"Name doesn't match with page title. Name: {name}, URL: {url}, Page title: {title.string} - {ratio_title}, OG Title {og_title} - {ratio_ogtitle}")
+        log.debug(
+            f"Name doesn't match with page title. Name: {name}, URL: {url}, Page title: {title.string} - {ratio_title}, OG Title {og_title} - {ratio_ogtitle}"
+        )
         return False
 
     return soup
@@ -157,80 +171,88 @@ def extract_socialprofile(soup, url, name):
     if og_image_tag:
         og_image = og_image_tag.content
         og_image_url = urllib.parse.urljoin(url, og_image)
-        log.debug(f"og:image found. Name: {name}, URL: {url}, Image URL: {og_image_url}")
+        log.debug(
+            f"og:image found. Name: {name}, URL: {url}, Image URL: {og_image_url}"
+        )
 
     twitter_image_tag = soup.find("meta", attrs={"property": "twitter:image"})
     if twitter_image_tag:
         twitter_image = twitter_image_tag.content
         twitter_image_url = urllib.parse.urljoin(url, twitter_image)
-        log.debug(f"twitter:image found. Name: {name}, URL: {url}, Image URL: {twitter_image_url}")
+        log.debug(
+            f"twitter:image found. Name: {name}, URL: {url}, Image URL: {twitter_image_url}"
+        )
 
     og_description = soup.find("meta", attrs={"property": "og:description"})
     if og_description:
         og_description = og_description.content
-        log.debug(f"og_description found. Name: {name}, URL: {url}, Image URL: {og_description}")
+        log.debug(
+            f"og_description found. Name: {name}, URL: {url}, Image URL: {og_description}"
+        )
 
     schemaorg_name = soup.find("meta", attrs={"property": "name"})
     if schemaorg_name:
         schemaorg_name = schemaorg_name.get("content")
-        log.debug(f"Schema.org Name found. Name: {name}, URL: {url}, Schema.org Name: {schemaorg_name}")
+        log.debug(
+            f"Schema.org Name found. Name: {name}, URL: {url}, Schema.org Name: {schemaorg_name}"
+        )
 
     location = soup.find("div", class_="profile-location")
     if location:
         location = location.contents[3].text
         log.debug(f"Location {location}")
 
-        
+
 class SocialNetworkMiner:
-    """Mine for social network profiles related to a person
-    """
+    """Mine for social network profiles related to a person"""
 
     # supported social networks and theirs urls
     socialnetworks_urls = {
         # 'crunchbase': "https://crunchbase.com/person/{identifier}",
-        'facebook': "https://www.facebook.com/{identifier}",
-        'github': "https://github.com/{identifier}",
-        'instagram': "https://instagram.com/{identifier}",
+        "facebook": "https://www.facebook.com/{identifier}",
+        "github": "https://github.com/{identifier}",
+        "instagram": "https://instagram.com/{identifier}",
         # linkedin don't let you scrap at all :(
-        #'linkedin': "https://linkedin.com/in/{identifier}",
-        'pinterest': "https://pinterest.com/{identifier}",
-        'snapchat':  "https://snapchat.com/add/{identifier}",   
-        #false positive
-        #'telegram': "https://telegram.me/{identifier}",
-        'tiktok':  "https://tiktok.com/@{identifier}",
+        # 'linkedin': "https://linkedin.com/in/{identifier}",
+        "pinterest": "https://pinterest.com/{identifier}",
+        "snapchat": "https://snapchat.com/add/{identifier}",
+        # false positive
+        # 'telegram': "https://telegram.me/{identifier}",
+        "tiktok": "https://tiktok.com/@{identifier}",
         # twitter is full javascript, needs a headless browser
-        'twitter': "https://twitter.com/{identifier}",
-        #"twitter#alt": "https://instalker.org/{identifier}",
+        "twitter": "https://twitter.com/{identifier}",
+        # "twitter#alt": "https://instalker.org/{identifier}",
         "twitter#alt": "https://nitter.net/{identifier}",
-        'youtube': "https://youtube.com/{identifier}",
+        "youtube": "https://youtube.com/{identifier}",
     }
 
     socialnetwork_extractors = {
-        'github': {
-            'name': "span.p-name.vcard-fullname.d-block.overflow-hidden",
-            'image': "/html/body/div[5]/main/div[2]/div/div[1]/div/div[2]/div[1]/div[1]/a/img"
+        "github": {
+            "name": "span.p-name.vcard-fullname.d-block.overflow-hidden",
+            "image": "/html/body/div[5]/main/div[2]/div/div[1]/div/div[2]/div[1]/div[1]/a/img",
         }
-
     }
 
     def __init__(self, person: dict, socialnetworks: Optional[list] = None):
         # person init
         self._original_person = person
         self._person = person.copy()
-        if not 'identifier' in self._person:
-            self._person['identifier'] = set()
-        elif type(self._person['identifier']) == str:
-            self._person['identifier'] = {self._person['identifier']}
-        elif type(self._person['identifier']) == list:
-            self._person['identifier'] = set(self._person['identifier'])
-        if not 'sameAs' in self._person:
-            self._person['sameAs'] = set()
+        if not "identifier" in self._person:
+            self._person["identifier"] = set()
+        elif type(self._person["identifier"]) == str:
+            self._person["identifier"] = {self._person["identifier"]}
+        elif type(self._person["identifier"]) == list:
+            self._person["identifier"] = set(self._person["identifier"])
+        if not "sameAs" in self._person:
+            self._person["sameAs"] = set()
 
         # one could choose to opt out some social networks
         if socialnetworks:
             self.socialnetworks_urls = {
-                sn: url for sn, url in self.socialnetworks_urls.items() if sn.split("#alt")[0] in socialnetworks
-                }
+                sn: url
+                for sn, url in self.socialnetworks_urls.items()
+                if sn.split("#alt")[0] in socialnetworks
+            }
             self.socialnetworks = socialnetworks
         else:
             self.socialnetworks = self.socialnetworks_urls.keys()
@@ -241,29 +263,33 @@ class SocialNetworkMiner:
 
     @property
     def person(self):
-        return {
-            k:v for k,v in self._person.items()
-            if k not in self._original_person
-            }        
-        
+        return {k: v for k, v in self._person.items() if k not in self._original_person}
+
     def image(self, match_check: bool = True) -> dict:
         """Look for social profiles using profile picture
 
         Returns:
             dict: dict of profiles urls by social network
         """
-        pages = find_pages_with_matching_images(self._person['image'])
+        pages = find_pages_with_matching_images(self._person["image"])
         for page in pages:
             url_matched = re.match(generic_socialprofile_regexp, page.url)
-            #valid_sp = is_valid_socialprofile(url_matched.group(0), self._person['name'])  
-            if not url_matched or not url_matched["socialnetwork"] in self.socialnetworks_urls:
-                log.debug(f"Invalid/existing social network profile: {page.url}")
+            # valid_sp = is_valid_socialprofile(url_matched.group(0), self._person['name'])
+            if (
+                not url_matched
+                or not url_matched["socialnetwork"] in self.socialnetworks_urls
+            ):
+                log.debug(
+                    f"Invalid/existing social network profile: {page.url}")
                 continue
-            page_title = BeautifulSoup(page.page_title, "html.parser").contents[0].text
-            if match_check and not match_name(self._person['name'], page_title):
-                log.debug(f"Social Profile: {page_title} doesn't match name {self._person['name']}")
+            page_title = BeautifulSoup(
+                page.page_title, "html.parser").contents[0].text
+            if match_check and not match_name(self._person["name"], page_title):
+                log.debug(
+                    f"Social Profile: {page_title} doesn't match name {self._person['name']}"
+                )
                 continue
-    
+
             log.debug(f"Social Network Profile found: {url_matched.group(0)}")
             m = url_matched.groupdict()
 
@@ -274,16 +300,16 @@ class SocialNetworkMiner:
 
         log.debug(f"Profiles found by image: {self.profiles}")
         return self.profiles
-    
+
     def add_profile(self, url, socialnetwork, identifier, tld, subdomain=None):
         self.profiles[socialnetwork] = {
-                'url': url,
-                'identifier': identifier,
-                'tld': tld,
-                'subdomain': subdomain,
+            "url": url,
+            "identifier": identifier,
+            "tld": tld,
+            "subdomain": subdomain,
         }
-        self._person['identifier'].add(identifier)
-        self._person['sameAs'].add(url)
+        self._person["identifier"].add(identifier)
+        self._person["sameAs"].add(url)
 
     def identifier(self) -> dict:
         """Look for social profiles using identifiers
@@ -292,25 +318,27 @@ class SocialNetworkMiner:
             dict: dict of profiles urls by social network
         """
         # if we don't have any identifier we'll use temporary ones
-        identifiers = self._person['identifier'] or self._generate_identifiers()
-            
+        identifiers = self._person["identifier"] or self._generate_identifiers(
+        )
+
         for idr in identifiers:
             for sn, url in self.socialnetworks_urls.items():
                 # pass existing social networks profiles
                 if sn in self.profiles:
                     continue
-                
+
                 url = url.format(identifier=idr)
                 # priority for the alternative mirror if it exists
                 if f"{sn}#alt" in self.socialnetworks_urls:
                     continue
                 # check if there is this person profile for this social network
-                soup = is_valid_socialprofile(url, self._person['name'])
+                soup = is_valid_socialprofile(url, self._person["name"])
                 if soup:
                     # replace alternative mirror URL with the original one
                     if sn.endswith("#alt"):
                         sn = sn.removesuffix("#alt")
-                        url = self.socialnetworks_urls[sn].format(identifier=idr)
+                        url = self.socialnetworks_urls[sn].format(
+                            identifier=idr)
                     m = re.match(generic_socialprofile_regexp, url).groupdict()
                     self.add_profile(url, **m)
                     # extract_socialprofile(soup, url, self._person['name'])
@@ -319,45 +347,54 @@ class SocialNetworkMiner:
 
     def _populate_profiles(self, email: bool = True):
         urls = []
-        if 'url' in self._person:
-            urls.append(self._person['url'])
-        if 'sameAs' in self._person:
-            urls.extend(self._person['sameAs'])
+        if "url" in self._person:
+            urls.append(self._person["url"])
+        if "sameAs" in self._person:
+            urls.extend(self._person["sameAs"])
 
         for url in urls:
             url_matched = re.match(generic_socialprofile_regexp, url)
             if url_matched:
                 m = url_matched.groupdict()
-                if m['socialnetwork'] not in self.profiles and m['socialnetwork'] in self.socialnetworks:
+                if (
+                    m["socialnetwork"] not in self.profiles
+                    and m["socialnetwork"] in self.socialnetworks
+                ):
                     self.add_profile(url, **m)
 
     def _generate_identifiers(self):
         id_email = self._generate_identifier_from_email()
         id_name = self._generate_identifier_from_name()
-        return {
-            id_email,
-            id_name
-        } if id_email else {id_name}
-        
+        return {id_email, id_name} if id_email else {id_name}
+
     def _generate_identifier_from_name(self):
-        return self._person['name'].encode("ASCII", "ignore").strip().lower().decode().replace(' ', '')
+        return (
+            self._person["name"]
+            .encode("ASCII", "ignore")
+            .strip()
+            .lower()
+            .decode()
+            .replace(" ", "")
+        )
 
     def _generate_identifier_from_email(self):
-        id_email = ''.join(
-                filter(str.isalnum, self._person['email'].split('@')[0].split('+')[0])
-                )
+        id_email = "".join(
+            filter(str.isalnum, self._person["email"].split(
+                "@")[0].split("+")[0])
+        )
         # useful only if really different from name
         # otherwise, it gives too much false positive
-        if fuzz.partial_token_sort_ratio(id_email, self._person['name']) > 81:
+        if fuzz.partial_token_sort_ratio(id_email, self._person["name"]) > 81:
             return None
         return id_email
 
-  
+
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(
-                    prog='Vision Miner',
-                    description='Find someone using his profile picture')
+        prog="Vision Miner", description="Find someone using his profile picture"
+    )
     parser.add_argument("-n", "--name")
     parser.add_argument("-i", "--identifier")
     parser.add_argument("-g", "--image")
@@ -365,8 +402,14 @@ if __name__ == "__main__":
     parser.add_argument("-u", "--url")
     parser.add_argument("-s", "--socialnetwork")
     args = parser.parse_args()
-    
-    p = dict(name=args.name, identifier=args.identifier, image=args.image, email=args.email, sameAs=[])
+
+    p = dict(
+        name=args.name,
+        identifier=args.identifier,
+        image=args.image,
+        email=args.email,
+        sameAs=[],
+    )
 
     s = SocialNetworkMiner(p, socialnetworks=args.socialnetwork)
     print(s.identifier())

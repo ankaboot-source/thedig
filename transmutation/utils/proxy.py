@@ -17,9 +17,9 @@ ISPROXY_URL = "http://ip-api.com/json/{ip}?fields=status,proxy"
 ISPROXY_URL_BATCH = "http://ip-api.com/batch?fields=status,proxy,query"
 MAX_ISPROXY_BATCH = 100
 CHECK_URL = {
-    'url' : "https://google.com",
-#    'url': "https://vpnapi.io/proxy-detection",
-#    'not_proxy': "this IP address is not a proxy server",
+    "url": "https://google.com",
+    #    'url': "https://vpnapi.io/proxy-detection",
+    #    'not_proxy': "this IP address is not a proxy server",
 }
 CHECK_MAX = 100
 MAX_CHECK_WORKERS = 20
@@ -31,8 +31,8 @@ MAX_WORKERS = 10
 PROXY_SOURCES = {
     "https": [
         "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/https.txt",
-        "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt"
-        ],
+        "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
+    ],
     "socks5": [
         "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
         "https://raw.githubusercontent.com/B4RC0DE-TM/proxy-list/main/SOCKS5.txt",
@@ -49,6 +49,7 @@ PROXY_SOURCES = {
         "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
     ],
 }
+
 
 def random_ua_headers():
     """
@@ -72,8 +73,8 @@ class ProxyMiner:
         protocol: str = PROXY_PROTOCOL,
         timeout: int = TIMEOUT,
         sources: dict = PROXY_SOURCES,
-        checker: str = CHECK_URL
-        ):
+        checker: str = CHECK_URL,
+    ):
         self.protocol = protocol
         self.timeout = timeout
         self.sources = sources
@@ -81,21 +82,21 @@ class ProxyMiner:
         self.proxies = set()
 
         self.sources["https"].extend(
-            [self._get_sslproxies,
-            self._get_clarketm,]
+            [
+                self._get_sslproxies,
+                self._get_clarketm,
+            ]
         )
 
     def _get_sslproxies(self):
         """Get HTTPS proxies from sslproxies.org"""
         r = requests.get(
-            'https://www.sslproxies.org/',
-            random_ua_headers(),
-            timeout=self.timeout
-            )
-        soup = BeautifulSoup(r.text, 'html.parser')
-        proxies_table = soup.find("table", class_='table-striped').tbody
-        for row in proxies_table.find_all('tr'):
-            proxy = row.find_all('td')
+            "https://www.sslproxies.org/", random_ua_headers(), timeout=self.timeout
+        )
+        soup = BeautifulSoup(r.text, "html.parser")
+        proxies_table = soup.find("table", class_="table-striped").tbody
+        for row in proxies_table.find_all("tr"):
+            proxy = row.find_all("td")
             ip = proxy[0].string
             port = proxy[1].string
             self.proxies.update(f"https://{ip}:{port}")
@@ -105,17 +106,19 @@ class ProxyMiner:
         """Get HTTPS proxies from clarketm on github"""
         r = requests.get(
             "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list.txt",
-            timeout=self.timeout
-            )
+            timeout=self.timeout,
+        )
         for proxy_l in r.text.splitlines()[6:-2]:
-            if 'S' in proxy_l:
-                self.proxies.update("https://%s" % proxy_l.split(' ')[0])
+            if "S" in proxy_l:
+                self.proxies.update("https://%s" % proxy_l.split(" ")[0])
         log.debug(f"🪲 Proxies clarketm number: {len(proxies)}")
 
     def _get_proxies(self, url: str):
         """Get proxies list from github and al"""
         r = requests.get(url, timeout=self.timeout)
-        self.proxies.update({f"{self.protocol}://{proxy}" for proxy in r.text.splitlines()})
+        self.proxies.update(
+            {f"{self.protocol}://{proxy}" for proxy in r.text.splitlines()}
+        )
         log.debug(f"🪲 Proxies number from {url}: {len(self.proxies)}")
 
     def get(self) -> list[str]:
@@ -142,11 +145,11 @@ class ProxyMiner:
         log.debug(f"🪲 Testing proxy: {proxy}")
         try:
             r = requests.get(
-                self.checker['url'],
+                self.checker["url"],
                 random_ua_headers(),
                 proxies={"https": proxy},
-                timeout=self.timeout
-                )
+                timeout=self.timeout,
+            )
         except requests.ConnectTimeout:
             log.debug(f"❌ Proxy timeout: {proxy}")
             return False
@@ -175,9 +178,13 @@ class ProxyMiner:
         # We can use a with statement to ensure threads are cleaned up promptly
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             proxies_clean = set()
-            log.info(f"Checking if {len(self.proxies)} proxies given are working")
+            log.info(
+                f"Checking if {len(self.proxies)} proxies given are working")
             # Start the load operations and mark each future with its URL
-            future_proxies = {executor.submit(self._clean_proxy, proxy): proxy for proxy in self.proxies}
+            future_proxies = {
+                executor.submit(self._clean_proxy, proxy): proxy
+                for proxy in self.proxies
+            }
             for proxy in as_completed(future_proxies):
                 if proxy.result():
                     proxies_clean.update(future_proxies[proxy])
@@ -190,22 +197,20 @@ class ProxyMiner:
             r = requests.get(check_url.format(ip=ip), timeout=self.timeout)
         except requests.RequestException:
             return None
-            
+
         r = r.json()
 
-        if r['status'] != "success":
+        if r["status"] != "success":
             log.warning(f"Failed to check: {ip}")
             return None
-        if r['proxy']:
+        if r["proxy"]:
             log.info(f"Proxy detected: {ip}")
             return True
         return False
 
     def verify(
-        self,
-        url: str = ISPROXY_URL_BATCH,
-        max: int = MAX_ISPROXY_BATCH
-        ) -> bool:
+        self, url: str = ISPROXY_URL_BATCH, max: int = MAX_ISPROXY_BATCH
+    ) -> bool:
         """Keep only proxies undetected as proxy by the webservice URL
 
         Args:
@@ -215,33 +220,44 @@ class ProxyMiner:
         Returns:
             bool: success
         """
-        ips = dict([p.removeprefix(f"{self.protocol}://").split(':')[:2] for p in self.proxies])
+        ips = dict(
+            [p.removeprefix(f"{self.protocol}://").split(":")[:2]
+             for p in self.proxies]
+        )
         ips_l = list(ips.keys())
-        chunks = [ips_l[x:x+max] for x in range(0, len(ips_l), max)]
+        chunks = [ips_l[x: x + max] for x in range(0, len(ips_l), max)]
         chunk_i = 1
         log.debug(f"Start Batch Testing. Chunks: {len(chunks)}.")
         for chunk in chunks:
             log.debug(f"Batch testing. Chunk: {chunk_i}/{len(chunks)}")
             try:
-                r = requests.post(url, data=str(chunk).replace("\'", '"'))
+                r = requests.post(url, data=str(chunk).replace("'", '"'))
             except requests.RequestException as e:
                 log.error(f"Batch testing. Request Error: {e}")
                 return None
-            
+
             if not r.ok:
                 log.error(f"Batch testing. HTTP Error: {r.text}")
                 return None
 
-            log.debug("🪲 Still %s requests in %s seconds" % (r.headers['X-Rl'], r.headers['X-Ttl']))
-            if int(r.headers['X-Rl']) == 0:
-                log.info(f"Batch testing. Chunk: {chunk_i}/{len(chunks)}. Sleep: {r.headers['X-Ttl']}s before next chunk")
-                sleep(int(r.headers['X-Ttl']))
+            log.debug(
+                "🪲 Still %s requests in %s seconds"
+                % (r.headers["X-Rl"], r.headers["X-Ttl"])
+            )
+            if int(r.headers["X-Rl"]) == 0:
+                log.info(
+                    f"Batch testing. Chunk: {chunk_i}/{len(chunks)}. Sleep: {r.headers['X-Ttl']}s before next chunk"
+                )
+                sleep(int(r.headers["X-Ttl"]))
 
             results = r.json()
-            self.proxies.update([
-                f"{self.protocol}://{p['query']}:{ips[p['query']]}"
-                for p in results if p['status'] == "success" and not p['proxy']
-                ])
+            self.proxies.update(
+                [
+                    f"{self.protocol}://{p['query']}:{ips[p['query']]}"
+                    for p in results
+                    if p["status"] == "success" and not p["proxy"]
+                ]
+            )
             chunk_i += 1
 
         return True
@@ -259,12 +275,13 @@ class ProxyMiner:
                 log.info(f"✅ {len(proxies)} proxies loaded from {filename}")
                 self.proxies.update(proxies)
             elif web:
-                log.warning(f"No proxies found in {filename}. Will load from Web")
+                log.warning(
+                    f"No proxies found in {filename}. Will load from Web")
                 self.get()
             else:
                 log.warning(f"No proxies found in {filename}")
 
-    def save(self, filename: str=PROXIES_FILE):
+    def save(self, filename: str = PROXIES_FILE):
         """Save list of proxies into file
 
         Args:
@@ -272,7 +289,7 @@ class ProxyMiner:
         """
         if self.proxies:
             f = open(filename, "w")
-            return f.write('\n'.join(self.proxies))
+            return f.write("\n".join(self.proxies))
 
     def random(self):
         return {self.protocol: random.choice(self.proxies)}
@@ -282,12 +299,13 @@ class ProxyMiner:
         self.verify()
         self.clean()
 
+
 if __name__ == "__main__":
     log.remove(0)
     log.add(sys.stderr, level="INFO")
 
     pm = ProxyMiner()
-    if len(sys.argv)>1:
+    if len(sys.argv) > 1:
         proxies_file = sys.argv[1]
         pm.load(proxies_file)
     else:
@@ -300,6 +318,6 @@ if __name__ == "__main__":
 
     if not pm.proxies:
         sys.exit(1)
-    
+
     pm.save(proxies_file)
     log.info(f"Random proxy: {pm.random()}")
