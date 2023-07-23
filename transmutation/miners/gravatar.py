@@ -34,9 +34,8 @@ def gravatar(email: str, check: bool = True) -> str:
         str: Gravatar URL
     """
     gravatar_image_url = GRAVATAR_URL.format(
-        hashed_email=email_hash(email),
-        size=GRAVATAR_SIZE
-        )
+        hashed_email=email_hash(email), size=GRAVATAR_SIZE
+    )
 
     # if no check is needed that's over
     if not check:
@@ -51,6 +50,7 @@ def gravatar(email: str, check: bool = True) -> str:
 # command line usage only for dev purpose
 if __name__ == "__main__":
     import sys
+
     url = gravatar(sys.argv[1])
 
     print(url)
@@ -74,7 +74,12 @@ if __name__ == "__main__":
             if r > 248:
                 return 231
             return round(((r - 8) / 247) * 24) + 232
-        return 16 + (36 * round(r / 255 * 5)) + (6 * round(g / 255 * 5)) + round(b / 255 * 5)
+        return (
+            16
+            + (36 * round(r / 255 * 5))
+            + (6 * round(g / 255 * 5))
+            + round(b / 255 * 5)
+        )
 
     def get_color(r, g, b):
         return "\x1b[48;5;{}m \x1b[0m".format(int(get_ansi_color_code(r, g, b)))
@@ -82,7 +87,7 @@ if __name__ == "__main__":
     def show_image(url_image: str, height: int = 100):
         response = requests.get(url_image)
         img = Image.open(BytesIO(response.content))
-        img.convert('RGB')
+        img.convert("RGB")
 
         width = int((img.width / img.height) * height)
 
@@ -93,7 +98,7 @@ if __name__ == "__main__":
         for x in range(h):
             for y in range(w):
                 pix = img_arr[x][y]
-                print(get_color(pix[0], pix[1], pix[2]), sep='', end='')
+                print(get_color(pix[0], pix[1], pix[2]), sep="", end="")
             print()
 
-    show_image(url, int(GRAVATAR_SIZE/10))
+    show_image(url, int(GRAVATAR_SIZE / 10))

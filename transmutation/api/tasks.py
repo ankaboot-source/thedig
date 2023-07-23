@@ -1,5 +1,6 @@
 """Background Tasks management using Celery"""
 
+from curl_cffi import requests
 import time
 
 # config
@@ -28,7 +29,6 @@ celery_tasks.task_annotations = {"tasks.add": {"rate_limit": "1/min"}}
 
 # app.conf.task_annotations = {"*" : "100/min"}
 
-from curl_cffi import requests
 
 search_api_params = {
     "google_api_key": settings.google_api_key,
@@ -40,6 +40,7 @@ search_api_params = {
 # Load task modules from all registered Django app configs.
 celery_tasks.autodiscover_tasks()
 
+
 # here begin tasks
 @celery_tasks.task
 def patch_person(name, email, search_api_params: dict, callback_params: dict):
@@ -48,7 +49,8 @@ def patch_person(name, email, search_api_params: dict, callback_params: dict):
         p_patched = miner.search(name=name, email=email)
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 429:
-            log.info("Search API Rate limits hit. We pause then try again in 1 minute.")
+            log.info(
+                "Search API Rate limits hit. We pause then try again in 1 minute.")
             # Google limits 100 requests / minute
             time.sleep(60)
             p_patched = miner.search(name=name, email=mail)
@@ -109,7 +111,8 @@ def patch_persons(self, endpoint: str, headers: dict, persons: list[dict]) -> in
         if p_patched.worksFor:
             w_json = p_patched.worksFor.json(exclude={"type_"})
             p_patched.worksFor = p_patched.worksFor.name
-            r = requests.post(f"{endpoint}organizations", data=w_json, headers=headers)
+            r = requests.post(f"{endpoint}organizations",
+                              data=w_json, headers=headers)
 
         p_json = p_patched.json(exclude={"type_"})
         r = requests.post(f"{endpoint}persons", data=p_json, headers=headers)
