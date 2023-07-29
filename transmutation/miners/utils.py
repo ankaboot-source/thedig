@@ -10,7 +10,7 @@ from fake_useragent import UserAgent
 TOKEN_RATIO = 82
 
 
-def ua_headers(random: bool=False) -> dict:
+def ua_headers(random: bool = False) -> dict:
     """
     generate a random user-agent
     basic techniques against bot blockers
@@ -30,6 +30,4 @@ def match_name(name: str, text: str) -> bool:
 
 
 def normalize(name: str) -> str:
-    return name.encode(
-        "ASCII", "ignore"
-        ).strip().lower().decode().replace(' ', '')
+    return name.encode("ASCII", "ignore").strip().lower().decode().replace(" ", "")
