@@ -15,19 +15,17 @@ class Alchemist:
     """Enrich iteratively persons using miners"""
 
     _ordered_elements = {
-            'url',
-            'sameAs',
-            'email',
-            'image',
-            'description',
-            'name',
+        "url",
+        "sameAs",
+        "email",
+        "image",
+        "description",
+        "name",
     }
 
     def __init__(self):
         self.elements = set()
-        self.miners = OrderedDict({
-            k: [] for k in self._ordered_elements
-        })
+        self.miners = OrderedDict({k: [] for k in self._ordered_elements})
 
     async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
@@ -40,7 +38,7 @@ class Alchemist:
         """
         elements = list(person.keys() & self.elements)
 
-        #log.debug(f"mining {elements} for {person}")
+        # log.debug(f"mining {elements} for {person}")
 
         modified = False
         # sync because we want to control the order of mining elements
@@ -53,24 +51,24 @@ class Alchemist:
 
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
-                p_mined = await miner['func'](person)
+                p_mined = await miner["func"](person)
                 if not p_mined or p_mined == person:
                     continue
                 if "OptOut" in p_mined:
                     return False, {"OptOut": True}
-                
+
                 log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
-                
+
                 if not modified:
                     modified = True
 
                 for k, v in p_mined.items():
                     # eligibility to update
-                    if miner['output'] and k not in miner['output']:
+                    if miner["output"] and k not in miner["output"]:
                         continue
                     if not v:
                         continue
-                    
+
                     # real update
                     # gymnastic to update/add set
                     if k not in person:
@@ -81,16 +79,18 @@ class Alchemist:
                         else:
                             person[k].add(v)
                     elif type(v) is set:
-                        person[k] = {person[k],} | v
+                        person[k] = {
+                            person[k],
+                        } | v
                     else:
                         person[k] = {person[k], v}
-                            
+
                     log.debug(f"updated {k} : {v}")
                     # eligibility to mine
                     if k in self.elements:
-                        elements.append(k)  
+                        elements.append(k)
                         log.debug(f"new element to mine: {k}")
-                                                  
+
         return modified, person if modified else None
 
     async def bulk(self, persons: list[dict]):
@@ -115,13 +115,13 @@ class Alchemist:
         Returns:
             function: miner
         """
+
         def decorator(miner_func):
             if element in self._ordered_elements:
                 log.debug(f"add {miner_func} to miners for {element}")
-                self.miners[element].append({
-                    'func': miner_func,
-                    'output': output
-                     })
+                self.miners[element].append(
+                    {"func": miner_func, "output": output})
                 self.elements.add(element)
             return miner_func
+
         return decorator
