@@ -8,6 +8,7 @@ from pydantic import TypeAdapter
 from pydantic import EmailStr, HttpUrl
 from typing_extensions import TypedDict
 
+
 class Person(TypedDict, total=False):
     name: str | set[str]
     email: EmailStr | set[EmailStr]

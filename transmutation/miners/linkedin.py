@@ -14,12 +14,14 @@ except ImportError:
 
 import re
 import threading
+
 # needed for memory sharing between threads
 from multiprocessing.sharedctypes import Value
 
 from pydantic import AnyHttpUrl
 
 from curl_cffi import requests
+
 # log
 from loguru import logger as log
 
@@ -27,7 +29,10 @@ from loguru import logger as log
 from thefuzz import fuzz
 
 # linkedin profile url with an ISO3166 country code regular expression
-LINKEDIN_URL_RE = re.compile(r"https:\/\/(?P<countrycode>\w{2})?(www)?\.?linkedin\.com\/in\/(?P<identifier>\w+)")
+LINKEDIN_URL_RE = re.compile(
+    r"https:\/\/(?P<countrycode>\w{2})?(www)?\.?linkedin\.com\/in\/(?P<identifier>\w+)"
+)
+
 
 def url_to_socialprofile(url: AnyHttpUrl) -> tuple:
     """Extract from an url a social network profile
@@ -36,13 +41,13 @@ def url_to_socialprofile(url: AnyHttpUrl) -> tuple:
         url (AnyHttpUrl): social network profile url
 
     Returns:
-        socialnetwork, identifier: social network domain, identifier on this social network 
+        socialnetwork, identifier: social network domain, identifier on this social network
     """
     socialnetwork, identifier = None, None
     url_matched = re.match(SOCIALPROFILE_RE, url)
     if url_matched:
-        socialnetwork = url_matched.groupdict()['socialnetwork']
-        identifier = url_matched.groupdict()['identifier']
+        socialnetwork = url_matched.groupdict()["socialnetwork"]
+        identifier = url_matched.groupdict()["identifier"]
     return socialnetwork, identifier
 
 
@@ -58,7 +63,7 @@ def country_from_url(linkedin_url: str) -> str:
     """
     match = LINKEDIN_URL_RE.match(linkedin_url)
 
-    if match and match['countrycode']:
+    if match and match["countrycode"]:
         return ISO3166[match["countrycode"].upper()]
 
 
@@ -89,7 +94,7 @@ class LinkedInSearch:
     """
 
     NUM_RESULTS = 10
-    
+
     # either q or exactTerms (don't work for emails)
     QUERY_TYPE = "q"
     GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image)"
@@ -134,11 +139,13 @@ class LinkedInSearch:
 
         if bing:
             self.bing = True
-            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
+            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(
+                **search_api_params)
             log.debug("Build Bing search URL : " + self.bing_search_url)
 
         if not bing and not google:
-            raise ValueError("Must choose at least one search engine: bing or google")
+            raise ValueError(
+                "Must choose at least one search engine: bing or google")
 
         if bulk:
             self.persons = []
@@ -203,55 +210,58 @@ class LinkedInSearch:
 
     def _add_country(self):
         """add country name to the dict JSON-LD based on the linkedin profile url"""
-        if 'url' in self.person:
-            country = country_from_url(self.person['url'])
+        if "url" in self.person:
+            country = country_from_url(self.person["url"])
             if country:
-                self.person['workLocation'] = country
+                self.person["workLocation"] = country
 
     def _extract_bing_specific(self, result):
         # sometimes it's an useless thumbnail : 404 Error
-        self.person['image'] = result["openGraphImage"]["contentUrl"]
-        self.person['url'] = result["url"]
+        self.person["image"] = result["openGraphImage"]["contentUrl"]
+        self.person["url"] = result["url"]
 
         # Bing also gives you sometimes location
         address = result["richFacts"][0]["items"][0]["text"].split(", ")
         # however sometimes the address isn't correctly identified by Bing
         if len(address) >= 3:
-            self.person['workLocation'] = ', '.join(address)
+            self.person["workLocation"] = ", ".join(address)
 
     def _extract_google_specific(self, result):
-        self.person['givenName'] = result["pagemap"]["metatags"][0]["profile:first_name"]
-        self.person['familyName'] = result["pagemap"]["metatags"][0]["profile:last_name"]
+        self.person["givenName"] = result["pagemap"]["metatags"][0][
+            "profile:first_name"
+        ]
+        self.person["familyName"] = result["pagemap"]["metatags"][0][
+            "profile:last_name"
+        ]
 
         # we do not use cse_thumbnail (Google's image)
         if len(result["pagemap"]["metatags"]) >= 1:
-            self.person['image'] = result["pagemap"]["metatags"][0]["og:image"]
-        self.person['url'] = result["link"]
+            self.person["image"] = result["pagemap"]["metatags"][0]["og:image"]
+        self.person["url"] = result["link"]
 
     def _result_to_dict(self, result) -> dict:
-
         # build initial dict
         person_d = {
-            'givenName': result["pagemap"]["metatags"][0]["profile:first_name"],
-            'familyName': result["pagemap"]["metatags"][0]["profile:last_name"], 
-            'url': result["link"],
-            'identifier': re.match(LINKEDIN_URL_RE, result['link'])['identifier'],
+            "givenName": result["pagemap"]["metatags"][0]["profile:first_name"],
+            "familyName": result["pagemap"]["metatags"][0]["profile:last_name"],
+            "url": result["link"],
+            "identifier": re.match(LINKEDIN_URL_RE, result["link"])["identifier"],
         }
-        person_d['name'] = f"{person_d['givenName']} {person_d['familyName']}"
+        person_d["name"] = f"{person_d['givenName']} {person_d['familyName']}"
 
         # enrich with parsed from linkedin title
         full_title = parse_linkedin_title(result["title"])
         # the parsing worked only if name parsed is the same
-        if full_title['name'] == person_d['name']:
+        if full_title["name"] == person_d["name"]:
             person_d.update(full_title)
-        
+
         # add the image, yet
         # we do not use cse_thumbnail (Google's image)
         if len(result["pagemap"]["metatags"]) >= 1:
-            person_d['image'] = result["pagemap"]["metatags"][0]["og:image"]
+            person_d["image"] = result["pagemap"]["metatags"][0]["og:image"]
 
         return person_d
-    
+
     async def extract(
         self, name: str, email: str = None, company: str = None, google: bool = True
     ) -> dict:
@@ -286,8 +296,9 @@ class LinkedInSearch:
         persons_d = {}
         for r in results:
             # must be a valid profile link
-            if not re.match(LINKEDIN_URL_RE, r['link']):
-                log.debug(f"This url isn't a valid Linkedin Profile {r['link']}")
+            if not re.match(LINKEDIN_URL_RE, r["link"]):
+                log.debug(
+                    f"This url isn't a valid Linkedin Profile {r['link']}")
                 continue
 
             person_d = self._result_to_dict(r)
@@ -303,14 +314,14 @@ class LinkedInSearch:
 
             # check homonymous
             if name in persons_d:
-                return None            
+                return None
 
             persons_d[name] = person_d
-        
+
         # not found, bye
         if name not in persons_d:
             return None
-        
+
         persons_d[name].update(self.person)
         self.person = persons_d[name]
 
@@ -320,17 +331,18 @@ class LinkedInSearch:
         """
         search and return the public data for an email and/or company
         """
-        self.person = {'name': name}
+        self.person = {"name": name}
         if email:
             log.debug("Searching by name %s and email %s" % (name, email))
 
-            self.person['email'] = email
+            self.person["email"] = email
             if self.bing and self.google:
                 # creating threads
                 google = threading.Thread(
                     target=self.extract_google, args=(name, email)
                 )
-                bing = threading.Thread(target=self.extract_bing, args=(name, email))
+                bing = threading.Thread(
+                    target=self.extract_bing, args=(name, email))
 
                 # starting threads
                 google.start()
@@ -344,14 +356,14 @@ class LinkedInSearch:
             elif self.bing:
                 self.extract(name, email, google=False)
         if company:
-            self.person['worksFor'] = company
+            self.person["worksFor"] = company
             log.debug("Searching by name %s and company %s" % (name, company))
             await self.extract(name, company=company)
 
         self._add_country()
 
         # answer only if we found something
-        if 'url' in self.person:
+        if "url" in self.person:
             return self.person
 
     def bulk(self, persons: list[dict]) -> list:
@@ -364,7 +376,7 @@ class LinkedInSearch:
             list: list of dicts
         """
         for person in persons:
-            p_enrich = self.search(person['name'], person['email'])
+            p_enrich = self.search(person["name"], person["email"])
             if p_enrich:
                 self.persons.append(p_enrich)
 
