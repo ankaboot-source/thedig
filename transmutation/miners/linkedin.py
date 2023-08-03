@@ -135,11 +135,13 @@ class LinkedInSearch:
 
         if bing:
             self.bing = True
-            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
+            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(
+                **search_api_params)
             log.debug("Build Bing search URL : " + self.bing_search_url)
 
         if not bing and not google:
-            raise ValueError("Must choose at least one search engine: bing or google")
+            raise ValueError(
+                "Must choose at least one search engine: bing or google")
 
         if bulk:
             self.persons = []
@@ -302,7 +304,8 @@ class LinkedInSearch:
         for r in results:
             # must be a valid profile link
             if not re.match(RE_LINKEDIN_URL, r["link"]):
-                log.debug(f"This url isn't a valid Linkedin Profile {r['link']}")
+                log.debug(
+                    f"This url isn't a valid Linkedin Profile {r['link']}")
                 continue
 
             person_d = self._result_to_dict(r)

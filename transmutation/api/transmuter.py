@@ -173,7 +173,8 @@ async def mine_country(p: dict):
 async def transmute_one(email: EmailStr, name: str) -> dict:
     al_status, transmuted = await al.person({"email": email, "name": name})
     if not al_status:
-        raise HTTPException(status_code=404, detail="No result for this person")
+        raise HTTPException(
+            status_code=404, detail="No result for this person")
     return transmuted
 
 
@@ -214,7 +215,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 # cache.set(f"{user_id}-{person['email']}", transmuted.json(), ex=settings.cache_expiration)
                 transmuted_count += 1
 
-            response: PersonResponse = {"status": al_status, "person": transmuted}
+            response: PersonResponse = {
+                "status": al_status, "person": transmuted}
             person_response_ta.validate_python(response)
 
             # Send message when transmutation finished

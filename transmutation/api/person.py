@@ -21,7 +21,8 @@ class Person(TypedDict, total=False):
     identifier: str | set[str]
     image: HttpUrl | set[HttpUrl]
     jobTitle: str | set[str]
-    knowsLanguage: constr(pattern=RE_LANGUAGE) | set[constr(pattern=RE_LANGUAGE)]
+    knowsLanguage: constr(
+        pattern=RE_LANGUAGE) | set[constr(pattern=RE_LANGUAGE)]
     nationality: constr(pattern=RE_COUNTRY) | set[constr(pattern=RE_COUNTRY)]
     OptOut: bool
     sameAs: set[HttpUrl]
