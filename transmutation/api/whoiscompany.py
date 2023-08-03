@@ -41,7 +41,7 @@ async def whois_unique(domain: str) -> str:
     """
     if domain in settings.public_email_providers:
         return None
-    
+
     company = await cache.get(domain)
     if company:
         log.debug("Cache found for domain: %s" % domain)

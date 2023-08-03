@@ -14,13 +14,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def pick_nitter_instance(instances_url="https://status.d420.de/api/v1/instances"):
     instances = {
-        instance['ping_avg'] : instance['url']
-        for instance in get(instances_url).json()['hosts']
-        if instance["points"]>50
-        }
-    return instances[
-        choice(sorted(instances.keys())[:5])
-        ]
+        instance["ping_avg"]: instance["url"]
+        for instance in get(instances_url).json()["hosts"]
+        if instance["points"] > 50
+    }
+    return instances[choice(sorted(instances.keys())[:5])]
 
 
 class Settings(BaseSettings):
@@ -57,10 +55,9 @@ settings = Settings()
 
 if not settings.public_email_providers:
     try:
-        public_email_providers = get(settings.public_email_providers_url).json()
-        settings.public_email_providers = set(
-            public_email_providers
-            )
+        public_email_providers = get(
+            settings.public_email_providers_url).json()
+        settings.public_email_providers = set(public_email_providers)
     except ConnectionError as e:
         log.info(f"Impossible to GET public_email_providers_url: {e}")
 
@@ -73,6 +70,7 @@ if settings.redis_username:
         redis_credentials += f":{settings.redis_password}"
     redis_credentials += "@"
 redis_url = f"redis://{redis_credentials}{settings.redis_host}:{settings.redis_port}"
+
 
 async def setup_cache(settings: Settings, db: int) -> Redis:
     """setup cache based on Redis
@@ -96,8 +94,7 @@ async def setup_cache(settings: Settings, db: int) -> Redis:
     cache = await Redis(**redis_parameters)
     log.info(f"Set-up redis cache for {db}")
     return cache
-    
+
+
 # celery broker & backend based on redis
-celery_backend = (
-    celery_broker
-) = "{redis_url}/{settings.celery_redis_db}"
+celery_backend = celery_broker = "{redis_url}/{settings.celery_redis_db}"
