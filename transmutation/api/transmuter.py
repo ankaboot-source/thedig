@@ -61,11 +61,9 @@ al = Alchemist(router)
 
 
 @al.register(element="name")
-async def miner_linkedin(name: str, email: EmailStr=None, worksFor: str=None) -> Person:
+async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
     miner = LinkedInSearch(search_api_params)
-    person = await miner.search(
-        name=name, email=email, company=worksFor
-    )
+    person = await miner.search(name=name, email=email, company=worksFor)
     return person
 
 
@@ -88,10 +86,7 @@ async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
 @al.register(element="email", update=("image",))
 async def miner_gravatar(email) -> Person:
     avatar = await gravatar(email)
-    return (
-        {'image': avatar} if avatar
-        else {}
-    )
+    return {'image': avatar} if avatar else {}
 
 
 @al.register(element="email")
@@ -134,8 +129,10 @@ async def mine_worksfor(email: EmailStr) -> Person:
 
 
 @al.register(element="description", update=("jobTitle",))
-async def mine_bio(description: str=None) -> Person:
-    desc: set[str] = {description, }
+async def mine_bio(description: str = None) -> Person:
+    desc: set[str] = {
+        description,
+    }
 
     jt = set()
     for d in desc:
@@ -165,7 +162,8 @@ async def mine_country(email: EmailStr) -> Person:
 async def transmute_email(email: EmailStr, name: str) -> Person:
     al_status, transmuted = await al.person({"email": email, "name": name})
     if not al_status:
-        raise HTTPException(status_code=404, detail="No result for this person")
+        raise HTTPException(
+            status_code=404, detail="No result for this person")
     return transmuted
 
 
@@ -173,7 +171,8 @@ async def transmute_email(email: EmailStr, name: str) -> Person:
 async def transmute_person(person: Person) -> Person:
     al_status, transmuted = await al.person({"email": email, "name": name})
     if not al_status:
-        raise HTTPException(status_code=404, detail="No result for this person")
+        raise HTTPException(
+            status_code=404, detail="No result for this person")
     return transmuted
 
 
@@ -214,7 +213,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 # cache.set(f"{user_id}-{person['email']}", transmuted.json(), ex=settings.cache_expiration)
                 transmuted_count += 1
 
-            response: PersonResponse = {"status": al_status, "person": transmuted}
+            response: PersonResponse = {
+                "status": al_status, "person": transmuted}
             person_response_ta.validate_python(response)
 
             # Send message when transmutation finished
