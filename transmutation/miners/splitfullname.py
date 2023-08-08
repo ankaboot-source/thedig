@@ -220,7 +220,8 @@ def _split_fullname(fullname: str) -> dict:
 
     if first_word_upper ^ last_word_upper:
         # trick to reverse test
-        isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(f)
+        isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(
+            f)
         for i in range(len(words)):
             if isfamily(words[i]):
                 break
@@ -290,11 +291,11 @@ if __name__ == "__main__":
     if args.file:
         with open(args.file, newline="", encoding="utf-8-sig") as csvfile:
             reader = csv.DictReader(
-                csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL
-            )
+                csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
             for row in reader:
                 if row.get("Name"):
-                    s = split_fullname(row["Name"], row["Email"].split("@")[-1])
+                    s = split_fullname(
+                        row["Name"], row["Email"].split("@")[-1])
                     if s:
                         print(f"{row['Name']}: {s} from {row['Email']}")
                     else:
