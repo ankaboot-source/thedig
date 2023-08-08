@@ -96,7 +96,9 @@ class LinkedInSearch:
     QUERY_TYPE = "q"
     GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image)"
     GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num={num_results}&fields={google_fields}&{query_type}"
-    BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
+    BING_SEARCH_URL_BASE = (
+        "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
+    )
 
     def __init__(
         self,
@@ -130,17 +132,18 @@ class LinkedInSearch:
         if google:
             self.google = True
             self.google_search_url = self.GOOGLE_SEARCH_URL_BASE.format(
-                **search_api_params
-            )
+                **search_api_params)
             log.debug("Build Google search URL : " + self.google_search_url)
 
         if bing:
             self.bing = True
-            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
+            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(
+                **search_api_params)
             log.debug("Build Bing search URL : " + self.bing_search_url)
 
         if not bing and not google:
-            raise ValueError("Must choose at least one search engine: bing or google")
+            raise ValueError(
+                "Must choose at least one search engine: bing or google")
 
         if bulk:
             self.persons = []
@@ -159,10 +162,10 @@ class LinkedInSearch:
         async with requests.AsyncSession() as s:
             try:
                 r = await s.get(search_url_complete)
-                #import requests as req
-                #r = req.get(search_url_complete)
+                # import requests as req
+                # r = req.get(search_url_complete)
             except requests.RequestsError as e:
-            #except req.RequestException as e:
+                # except req.RequestException as e:
                 log.error(f"{search_url_complete}: {e}")
                 return None
             if not r.ok:
@@ -197,11 +200,7 @@ class LinkedInSearch:
 
         log.info("bing result %s" % result_raw)
         # if a data is missing, that means probably that there is no results
-        if (
-            "webPages" in result_raw
-            and "value" in result_raw["webPages"]
-            and len(result_raw["webPages"]["value"]) > 0
-        ):
+        if "webPages" in result_raw and "value" in result_raw["webPages"] and len(result_raw["webPages"]["value"]) > 0:
             return result_raw["webPages"]["value"][0]
 
         log.debug("No results found for query %s " % query)
@@ -225,12 +224,8 @@ class LinkedInSearch:
             self.person["workLocation"] = ", ".join(address)
 
     def _extract_google_specific(self, result):
-        self.person["givenName"] = result["pagemap"]["metatags"][0][
-            "profile:first_name"
-        ]
-        self.person["familyName"] = result["pagemap"]["metatags"][0][
-            "profile:last_name"
-        ]
+        self.person["givenName"] = result["pagemap"]["metatags"][0]["profile:first_name"]
+        self.person["familyName"] = result["pagemap"]["metatags"][0]["profile:last_name"]
 
         # we do not use cse_thumbnail (Google's image)
         if len(result["pagemap"]["metatags"]) >= 1:
@@ -282,18 +277,13 @@ class LinkedInSearch:
         Returns:
             person (str) : person JSON-LD filled with the infos mined
         """
-        query_string = quote(
-            email or linkedin_url or (f"{name} {company}" if company else name)
-        )
+        query_string = quote(email or linkedin_url or (
+            f"{name} {company}" if company else name))
         if not query_string:
             log.error("No query string could be built")
             raise ValueError
 
-        results = (
-            await self._search_google(query_string)
-            if google
-            else self._search_bing(query_string)
-        )
+        results = await self._search_google(query_string) if google else self._search_bing(query_string)
 
         if not results:
             log.debug("LinkedIn: No result found")
@@ -307,7 +297,8 @@ class LinkedInSearch:
         for r in results:
             # must be a valid profile link
             if not re.match(RE_LINKEDIN_URL, r["link"]):
-                log.debug(f"This url isn't a valid Linkedin Profile {r['link']}")
+                log.debug(
+                    f"This url isn't a valid Linkedin Profile {r['link']}")
                 continue
 
             person_d = self._result_to_dict(r)
@@ -317,8 +308,7 @@ class LinkedInSearch:
             # should do fine tuning here trained on a huge international dataset
             if fuzz.token_set_ratio(person_d["name"], name) < 96:
                 log.debug(
-                    f"The name mined doesn't match the name given: {person_d['name']}, {name}"
-                )
+                    f"The name mined doesn't match the name given: {person_d['name']}, {name}")
                 continue
 
             # check homonymous
@@ -337,9 +327,7 @@ class LinkedInSearch:
 
         return self.person
 
-    async def search(
-        self, name, email: str = None, company: str = None, linkedin_url: HttpUrl = None
-    ) -> dict:
+    async def search(self, name, email: str = None, company: str = None, linkedin_url: HttpUrl = None) -> dict:
         """
         search and return the public data for an email and/or company
         """
@@ -366,8 +354,5 @@ if __name__ == "__main__":
         "bing_customconfig": os.getenv("BING_CUSTOMCONFIG"),
     }
     miner = LinkedInSearch(search_api_params)
-    print(
-        miner.search(
-            name=" ".join(sys.argv[3:]), email=sys.argv[1], company=sys.argv[2]
-        )
-    )
+    print(miner.search(name=" ".join(
+        sys.argv[3:]), email=sys.argv[1], company=sys.argv[2]))
