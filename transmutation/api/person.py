@@ -24,14 +24,8 @@ class Person(TypedDict, total=False):
     identifier: str | set[str]
     image: HttpUrl | set[HttpUrl]
     jobTitle: str | set[str]
-    knowsLanguage: (
-        constr(pattern=RE_LANGUAGE) |
-        set[constr(pattern=RE_LANGUAGE)]
-        )
-    nationality: (
-        constr(pattern=RE_COUNTRY) |
-        set[constr(pattern=RE_COUNTRY)]
-        )
+    knowsLanguage: (constr(pattern=RE_LANGUAGE) | set[constr(pattern=RE_LANGUAGE)])
+    nationality: (constr(pattern=RE_COUNTRY) | set[constr(pattern=RE_COUNTRY)])
     OptOut: bool
     sameAs: HttpUrl | set[HttpUrl]
     url: HttpUrl
@@ -67,11 +61,15 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
         if field not in person:
             person[field] = set()
         elif not type(person[field]) is set:
-            person[field] = {person[field], }
+            person[field] = {
+                person[field],
+            }
         if type(value) is set:
             person[field] |= value
         else:
-            person[field] |= {value, }
+            person[field] |= {
+                value,
+            }
     else:
         person[field] = value
 

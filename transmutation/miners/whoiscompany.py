@@ -41,13 +41,7 @@ def get_domain(email: str) -> str:
 def remove_company_type_abbrv(company: str) -> str:
     last_word = company.split(', ')[-1].split(' ')[-1].removesuffix('.')
     if last_word in COMPANY_TYPE_ABBR:
-        return (
-            company
-            .removesuffix('.')
-            .removesuffix(last_word)
-            .removesuffix(", ")
-            .strip()
-            )
+        return company.removesuffix('.').removesuffix(last_word).removesuffix(", ").strip()
 
 
 def get_company(domain: str) -> str:
