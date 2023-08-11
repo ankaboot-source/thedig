@@ -62,11 +62,9 @@ al = Alchemist(router)
 
 
 @al.register(element="name")
-async def miner_linkedin(name: str, email: EmailStr=None, worksFor: str=None) -> Person:
+async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
     miner = LinkedInSearch(search_api_params)
-    person = await miner.search(
-        name=name, email=email, company=worksFor
-    )
+    person = await miner.search(name=name, email=email, company=worksFor)
     return person
 
 
@@ -90,10 +88,7 @@ async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
 @al.register(element="email", update=("image",))
 async def miner_gravatar(email) -> Person:
     avatar = await gravatar(email)
-    return (
-        {'image': avatar} if avatar
-        else {}
-    )
+    return {'image': avatar} if avatar else {}
 
 
 @al.register(element="email")
@@ -136,9 +131,12 @@ async def mine_worksfor(email: EmailStr) -> Person:
             works_for['worksFor'] = company
     return works_for
 
+
 @al.register(element="description", update=("jobTitle",))
-async def mine_bio(description: str=None) -> Person:
-    desc: set[str] = {description, }
+async def mine_bio(description: str = None) -> Person:
+    desc: set[str] = {
+        description,
+    }
     job_title = {}
     jt = set()
     for d in desc:

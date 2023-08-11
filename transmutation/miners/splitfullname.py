@@ -289,9 +289,7 @@ if __name__ == "__main__":
 
     if args.file:
         with open(args.file, newline="", encoding="utf-8-sig") as csvfile:
-            reader = csv.DictReader(
-                csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL
-            )
+            reader = csv.DictReader(csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
             for row in reader:
                 if row.get("Name"):
                     s = split_fullname(row["Name"], row["Email"].split("@")[-1])
