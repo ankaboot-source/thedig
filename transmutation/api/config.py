@@ -16,10 +16,7 @@ NITTER_BACKUP_INSTANCE = "https://nitter.net"
 
 
 def pick_nitter_instance(
-    instances_url=NITTER_INSTANCES,
-    backup_instance=NITTER_BACKUP_INSTANCE,
-    timeout=3,
-    min_points=50
+    instances_url=NITTER_INSTANCES, backup_instance=NITTER_BACKUP_INSTANCE, timeout=3, min_points=50
 ) -> str:
     instance = ""
     try:
@@ -28,9 +25,7 @@ def pick_nitter_instance(
             for instance in get(instances_url, timeout=timeout).json()["hosts"]
             if instance["points"] > min_points
         }
-        instance = instances[
-            choice(sorted(instances.keys())[:5])
-            ]
+        instance = instances[choice(sorted(instances.keys())[:5])]
     except ConnectionError:
         instance = backup_instance
     return instance
@@ -58,7 +53,9 @@ class Settings(BaseSettings):
     api_key_name: str
     bulk_size: int
     google_vision_credentials: str
-    public_email_providers_url: str = "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
+    public_email_providers_url: str = (
+        "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
+    )
     public_email_providers: Optional[set[str]] = None
     persons_bulk_max: int = 10000
     jobtitles_list_file: str = "miners/jobtitles.json"
@@ -70,7 +67,8 @@ settings = Settings()
 
 if not settings.public_email_providers:
     try:
-        public_email_providers = get(settings.public_email_providers_url).json()
+        public_email_providers = get(
+            settings.public_email_providers_url).json()
         settings.public_email_providers = set(public_email_providers)
     except ConnectionError as e:
         log.info(f"Impossible to GET public_email_providers_url: {e}")

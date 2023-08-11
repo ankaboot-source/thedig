@@ -74,8 +74,7 @@ class InterceptHandler(logging.Handler):
             depth += 1
 
         logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+            level, record.getMessage())
 
 
 try:
@@ -95,8 +94,7 @@ try:
 
             # Configure logger before gunicorn starts logging
             logger.configure(
-                handlers=[{"sink": sys.stdout, "level": log_settings.log_level}]
-            )
+                handlers=[{"sink": sys.stdout, "level": log_settings.log_level}])
 
 except:
     logger.info("No gunicorn here")

@@ -25,8 +25,7 @@ router = APIRouter()
 
 
 cache = asyncio.get_event_loop().run_until_complete(
-    setup_cache(settings, settings.cache_redis_db)
-)
+    setup_cache(settings, settings.cache_redis_db))
 
 
 @router.get("/whoiscompany/{domain}")

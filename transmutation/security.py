@@ -24,8 +24,7 @@ class UniversalAPIKey(APIKeyHeader):
         if not request and not websocket:
             if self.auto_error:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated"
-                )
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
             return None
         if websocket:
             return await APIKeyQuery.__call__(self, websocket)
@@ -41,10 +40,7 @@ api_key_header_auth = UniversalAPIKey(
 
 async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
     log.debug(f"Checking API Key authentication: {api_key_header}")
-    if not any(
-        secrets.compare_digest(api_key_header, api_key_v)
-        for api_key_v in settings.api_keys
-    ):
+    if not any(secrets.compare_digest(api_key_header, api_key_v) for api_key_v in settings.api_keys):
         log.debug(f"Invalid API Key {api_key_header}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
