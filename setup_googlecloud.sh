@@ -7,7 +7,7 @@ APP_NAME="thedig"
 SERVICE_ACCOUNT="${APP_NAME}-ai" # Using a single service account for Vision and Vertex
 
 # Fetch credential key path from .env
-eval "$(grep GOOGLE_AI_CREDENTIALS .env)"
+GOOGLE_AI_CREDENTIALS=$(grep 'GOOGLE_AI_CREDENTIALS' .env | awk -F= '{print $2}')
 
 # Create project and switch to it
 gcloud projects create $APP_NAME
