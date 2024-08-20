@@ -32,7 +32,7 @@ gcloud iam service-accounts create $SERVICE_ACCOUNT \
   --display-name "${APP_NAME} AI"
 
 # Create the key as JSON file 
-gcloud iam service-accounts keys create "${GOOGLE_AI_CREDENTIALS}" \
+gcloud iam service-accounts keys create "${GOOGLE_LOCAL_PATH_CREDENTIALS}" \
   --iam-account "${SERVICE_ACCOUNT}@${APP_NAME}.iam.gserviceaccount.com"
 
 # --- Vertex AI Search Setup ---
@@ -42,7 +42,7 @@ DATASTORE_ID="linkedin-index-$(date +%s)" # Example: Generate a unique ID
 gcloud datastore indexes create index.yaml --index-id="$DATASTORE_ID"
 
 # Vertex AI Search Index
-# Crawl daily at midnight UTC
+# Cron scheduel: Crawl daily at midnight UTC
 cat << EOF > linkedinprofileindex.json
 {
   "displayName": "LinkedIn Profile Index",
@@ -72,6 +72,6 @@ echo "Remember to manually create and configure Azure Bing Search and Brave Sear
 echo "Configure only your Google Custom Search Engine, then copy/paste the cx value to your .env file"
 echo "-------------------------"
 echo "Copy/paste following lines to your .env"
-echo "\$GOOGLE_CREDENTIALS=\"${GOOGLE_AI_CREDENTIALS}\""
+echo "\$GOOGLE_CREDENTIALS=\"${GOOGLE_LOCAL_PATH_CREDENTIALS}\""
 echo "\$GOOGLE_VERTEX_DATASTOREID=\"${DATASTORE_ID}\""
 echo "\$GOOGLE_VERTEXAI_PROJECTID=\"$(gcloud config get-value project)\""
