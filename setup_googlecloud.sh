@@ -42,6 +42,7 @@ DATASTORE_ID="linkedin-index-$(date +%s)" # Example: Generate a unique ID
 gcloud datastore indexes create index.yaml --index-id="$DATASTORE_ID"
 
 # Vertex AI Search Index
+# Crawl daily at midnight UTC
 cat << EOF > linkedinprofileindex.json
 {
   "displayName": "LinkedIn Profile Index",
@@ -50,7 +51,7 @@ cat << EOF > linkedinprofileindex.json
     "dataStoreId": "$DATASTORE_ID",
     "crawlConfig": {
       "crawlSchedule": {
-        "cron": "0 0 * * *" // Crawl daily at midnight UTC
+        "cron": "0 0 * * *"
       },
       "requiredSchemaMarker": "CUSTOM_EXTRACTED_REQUIRED_FIELDS",
       "urlWhitelistPatterns": [
