@@ -11,7 +11,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./:/app
-      - ${GOOGLE_VISION_CREDENTIALS}:/app/google-vision-thedig.json:ro
+      - ${GOOGLE_CREDENTIALS}:/app/google-credentials-thedig.json:ro
     ports:
       - "8080:8080"
     depends_on:

@@ -50,17 +50,9 @@ By using this application, you must abid to local, international and ethical pri
 ### Configure
 To run this project, you'll need a few environement variables which includes some API keys from Google. Please edit [default.env](default.env) and rename it as `.env`.
 
-You'll need a few API keys, at least Google Custom Search API and Google Vision (reverse-image search)
-- [Create a custom search engine](https://cse.google.com/cse/all)  by specifying "\*.linkedin.com" as specific sites to search on (name here doesn't matter). Once created note the *ID* created and set it in the `.env` file as `GOOGLE_CX` variable. Then you'll need an [API key](https://developers.google.com/custom-search/v1/overview#api_key). Be aware that such restricted search engine has a limited free plan, and you'll be billed above a limit defined by Google.
-- Run `setup_google.sh` to set-up automatically Google Vision API. By default, the project will be `thedig`` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
-  
-You could also generate manually all Google API Keys for text search and JSON service-account keys for reverse-image search by doing the following steps:
-  1. Visit https://console.developers.google.com and create a project.
-  2. Visit https://console.developers.google.com/apis/library/customsearch.googleapis.com and enable "Custom Search API" for your project.
-  3. Visit https://console.developers.google.com/apis/credentials and generate API key credentials for your project.
-  4. Visit https://cloud.google.com/vision/product-search/docs/auth and generate the JSON credential for your project.
+You'll need a few API keys, depending on which search engine you wish to use, yet Google Vision (reverse-image search) is mandatory. Have a look at [default.env] for instructions on how to create them.
 
-Please remember that Google's API provides a limited free tier. For instance, the [Custom Search Site Restricted JSON API provides 100 search queries per day for free](https://developers.google.com/custom-search/v1/site_restricted_api) and this program uses usually at least one search query per request. 
+In order to help you start smoothly, we provided a script for Google `setup_googlecloud.sh`. Run it to set-up automatically Google Vision API. By default, the project will be `thedig` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
 
 ### Launch
 
