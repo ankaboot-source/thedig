@@ -32,7 +32,7 @@ gcloud iam service-accounts create $SERVICE_ACCOUNT \
   --display-name "${APP_NAME} AI"
 
 # Create the key as JSON file 
-iam service-accounts keys create "${GOOGLE_AI_CREDENTIALS}" \
+gcloud iam service-accounts keys create "${GOOGLE_AI_CREDENTIALS}" \
   --iam-account "${SERVICE_ACCOUNT}@${APP_NAME}.iam.gserviceaccount.com"
 
 # --- Vertex AI Search Setup ---
