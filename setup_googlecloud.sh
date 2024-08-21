@@ -3,11 +3,9 @@
 # Help set-up the whole API keys
 
 # You can modify this
-APP_NAME="thedig"
+APP_NAME="thedig102"
 SERVICE_ACCOUNT="${APP_NAME}-ai" # Using a single service account for Vision and Vertex
-
-# Fetch credential key path from .env
-eval "$(grep GOOGLE_AI_CREDENTIALS .env)"
+GOOGLE_CREDENTIALS="./google-credentials-thedig.json" # The path where to generate google keys
 
 # Create project and switch to it
 gcloud projects create $APP_NAME
@@ -32,7 +30,7 @@ gcloud iam service-accounts create $SERVICE_ACCOUNT \
   --display-name "${APP_NAME} AI"
 
 # Create the key as JSON file 
-gcloud iam service-accounts keys create "${GOOGLE_AI_CREDENTIALS}" \
+gcloud iam service-accounts keys create "${GOOGLE_CREDENTIALS}" \
   --iam-account "${SERVICE_ACCOUNT}@${APP_NAME}.iam.gserviceaccount.com"
 
 # --- Vertex AI Search Setup ---
@@ -56,8 +54,8 @@ cat << EOF > linkedinprofileindex.json
       "urlWhitelistPatterns": [
         "*.linkedin.com/in/*"
       ]
-    }
-  }
+     }
+   }
 }
 EOF
 
@@ -71,6 +69,6 @@ echo "Remember to manually create and configure Azure Bing Search and Brave Sear
 echo "Configure only your Google Custom Search Engine, then copy/paste the cx value to your .env file"
 echo "-------------------------"
 echo "Copy/paste following lines to your .env"
-echo "\$GOOGLE_CREDENTIALS=\"${GOOGLE_AI_CREDENTIALS}\""
-echo "\$GOOGLE_VERTEX_DATASTOREID=\"${DATASTORE_ID}\""
+echo "\$GOOGLE_CREDENTIALS=\"${GOOGLE_CREDENTIALS}\""
+echo "\$GOOGLE_VERTEXAI_DATASTORE=\"${DATASTORE_ID}\""
 echo "\$GOOGLE_VERTEXAI_PROJECTID=\"$(gcloud config get-value project)\""
