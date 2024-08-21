@@ -3,7 +3,7 @@
 # Help set-up the whole API keys
 
 # You can modify this
-APP_NAME="thedig102"
+APP_NAME="thedig"
 SERVICE_ACCOUNT="${APP_NAME}-ai" # Using a single service account for Vision and Vertex
 GOOGLE_CREDENTIALS="./google-credentials-thedig.json" # The path where to generate google keys
 
