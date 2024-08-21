@@ -55,8 +55,8 @@ cat << EOF > linkedinprofileindex.json
       "urlWhitelistPatterns": [
         "*.linkedin.com/in/*"
       ]
-     }
-   }
+    }
+  }
 }
 EOF
 
