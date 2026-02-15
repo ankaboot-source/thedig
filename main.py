@@ -18,7 +18,7 @@ from thedig.security import get_api_key
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     setup_logger_from_settings(log_level=settings.log_level)
     ar.cache = await setup_cache(settings, db=settings.cache_redis_db_person)
     ar.cache_expiration = settings.cache_expiration_person

@@ -5,7 +5,7 @@ Person Types
 import re
 
 from fastapi.exceptions import HTTPException
-from pydantic import EmailStr, HttpUrl, TypeAdapter, ValidationError, constr
+from pydantic import EmailStr, HttpUrl, TypeAdapter, constr
 from typing_extensions import TypedDict
 
 RE_COUNTRY = r"^[A-Z]{2}$"

@@ -295,7 +295,7 @@ async def company_from_societecom(name: str, proxy=None) -> Company | None:
                 cmp["numberOfEmployees"] = num_employees[0]
             else:
                 log.debug(f"Number of employees is void: {number_of_employees.text}")
-        except (UnicodeDecodeError, SystemError): #Why SystemError?!
+        except (UnicodeDecodeError, SystemError):  # Why SystemError?!
             log.error(f"Couldn't get number of employees because of encoding error from {url}")
 
     address = r.html.find("div.CompanyIdentity__adress__around").text.splitlines()
@@ -618,7 +618,10 @@ async def company_from_website(domain: DomainName, proxy=None):
         # <script content="" attribute or inside <script></script> element
         org_json_ = json.loads(org_js.attrs["content"] if "content" in org_js.attrs else org_js.text, strict=False)
         org_json = None
-        eligible_json = lambda x: x.get("@type", "").title() in ("Organization", "Corporation", "Website")
+
+        def eligible_json(candidate: dict) -> bool:
+            return candidate.get("@type", "").title() in ("Organization", "Corporation", "Website")
+
         # select only first eligible JSON
         if type(org_json_) is list:
             org_json = next(filter(eligible_json, org_json_), None)

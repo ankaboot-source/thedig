@@ -41,14 +41,14 @@ COUNTRY_TLD_EXCLUSION = {
 
 
 def absolutize(url: str, base_url: HttpUrl) -> HttpUrl:
-    if str(url).startswith("http"):
-        absolute_url = url
-    else:
-        absolute_url = urllib.parse.urljoin(base_url, str(url))
-    # if this didn't work, return empty string
-    if not str(absolute_url).startswith("http"):
-        absolute_url = ""
-    return absolute_url
+    url_str = str(url).strip()
+    if url_str.startswith("http"):
+        return url_str
+    if not url_str.startswith("/"):
+        return ""
+
+    absolute_url = urllib.parse.urljoin(str(base_url), url_str)
+    return absolute_url if str(absolute_url).startswith("http") else ""
 
 
 def get_tld(domain: str) -> str:
@@ -101,19 +101,28 @@ def match_name(name: str, text: str, fuzzy: bool = True, acronym: bool = False, 
     if fuzzy and fuzz.partial_token_sort_ratio(name, text) >= TOKEN_RATIO:
         return True
 
+    original_name = name
+    original_text = text
+
     if condensed:
+        name = name.replace(" ", "")
         text = text.replace(" ", "")
 
     match = name.casefold() == text.casefold()
 
     if not match and acronym:
-        match = name.casefold() == filter(str.isupper, text)
+        name_acronym = "".join(part[0] for part in original_name.split() if part)
+        text_acronym = "".join(part[0] for part in original_text.split() if part)
+        match = (
+            name_acronym.casefold() == original_text.casefold() or text_acronym.casefold() == original_name.casefold()
+        )
 
     return match
 
 
-def normalize(name: str, replace: dict = {" ": ""}) -> str:
+def normalize(name: str, replace: dict | None = None) -> str:
+    replacement = replace if replace is not None else {" ": "", ".": ""}
     name = str(name.encode("ASCII", "ignore").strip().decode()).casefold()
-    for k, v in replace.items():
+    for k, v in replacement.items():
         name = name.replace(k, v)
     return name

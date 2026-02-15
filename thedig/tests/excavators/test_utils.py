@@ -1,6 +1,3 @@
-import pytest
-from pydantic import HttpUrl
-
 from thedig.excavators.utils import (
     absolutize,
     domain_to_urls,

@@ -8,6 +8,8 @@ RUN apt-get update \
     && rm -rf /var/apt/lists/* \
     && rm -rf /var/cache/apt/*
 
+RUN pip install --no-cache-dir uv
+
 # Create a non-root user
 RUN useradd -m -s /bin/bash appuser
 
@@ -18,21 +20,16 @@ USER appuser
 ENV PYTHONDONTWRITEBYTECODE=True \
     PYTHONUNBUFFERED=True \
     PYTHONIOENCODING=utf-8 \
-    PATH=$PATH:/home/appuser/.local/bin
+    UV_LINK_MODE=copy \
+    PATH=/app/.venv/bin:$PATH:/home/appuser/.local/bin
 
 # Copy local code to the container image.
 ENV APP_HOME /app
 WORKDIR $APP_HOME
 
-COPY ./requirements.txt $APP_HOME/requirements.txt
-# Install dependencies.
-RUN pip install --no-cache-dir --upgrade -r $APP_HOME/requirements.txt
-
-#COPY tests/ tests/
-COPY thedig/ thedig/
-COPY .env ./
-
 COPY . $APP_HOME/
+
+RUN uv sync --frozen --no-dev --extra vision
 
 EXPOSE 8080
 

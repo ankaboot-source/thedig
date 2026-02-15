@@ -43,7 +43,7 @@ from ..excavators.utils import match_name
 from ..excavators.vision import SocialNetworkMiner
 
 # config
-from .config import Settings, settings, setup_cache
+from .config import settings, setup_cache
 from .person import (
     Person,
     PersonRequest,
@@ -65,6 +65,10 @@ router = APIRouter()
 ar = Archeologist(router)
 
 
+def json_dumps(payload: object) -> str:
+    return json.dumps(jsonable_encoder(payload))
+
+
 @ar.register(field="email", update=("worksFor",))
 async def worksfor(email: EmailStr) -> Person:
     # except for public email providers
@@ -80,11 +84,10 @@ async def worksfor(email: EmailStr) -> Person:
 @ar.register(field="name")
 async def linkedin(
     name: str,
-    email: EmailStr = None,
-    worksFor: str = None,
-    image: list[HttpUrl] | None = None
-    ) -> Person:
-
+    _email: EmailStr | None = None,
+    worksFor: str | None = None,
+    image: list[HttpUrl] | None = None,
+) -> Person:
     engine = SearchChain(settings).search(query=name, name=name)
     if not engine:
         return
@@ -98,13 +101,16 @@ async def linkedin(
                 return face_matches[0]
     return engine.persons[0] if engine.persons else None
 
+
 if hasattr(settings, "proxycurl_api_key"):
+
     @ar.register(field="url", insert=("image",))
     async def linkedin_to_image(url: HttpUrl) -> Person:
         image = linkedin_profile_picture(url, api_key=settings.proxycurl_api_key)
         if not image:
             return
         return {"image": str(image)}
+
 
 @ar.register(field="email", update=("image",))
 async def email_to_image(email) -> Person:
@@ -165,7 +171,7 @@ async def social(p: dict) -> Person:
 
 
 @ar.register(field="description", insert=("jobTitle",), enrich=False)
-async def bio(description: str = None) -> Person:
+async def bio(description: str | None = None) -> Person:
     desc: set[str] = (
         {
             description,
@@ -191,6 +197,7 @@ async def name(name: str, email: EmailStr) -> Person:
     splitted: Person = split_fullname(name, email.split("@")[1])
     return splitted
 
+
 @ar.register(field="email", insert=("workLocation",))
 async def country(email: EmailStr) -> Person:
     country = guess_country(email.split("@")[-1])
@@ -204,8 +211,8 @@ async def person_email(email: EmailStr, name: str) -> Person:
         raise HTTPException(status_code=204)
     return JSONResponse(
         status_code=status.HTTP_200_OK if enriched else status.HTTP_203_NON_AUTHORITATIVE_INFORMATION,
-        content=jsonable_encoder(persond)
-        )
+        content=jsonable_encoder(persond),
+    )
 
 
 @router.post("/person/", tags=("person", "archaeology"), dependencies=[Depends(verify_mandatory_fields)])
@@ -215,8 +222,9 @@ async def person_post(person: Person) -> Person:
         raise HTTPException(status_code=204)
     return JSONResponse(
         status_code=status.HTTP_200_OK if enriched else status.HTTP_203_NON_AUTHORITATIVE_INFORMATION,
-        content=jsonable_encoder(persond)
-        )
+        content=jsonable_encoder(persond),
+    )
+
 
 async def persons_bulk_background(
     persons: Annotated[Person, Field(max_items=MAX_BULK)], webhook_endpoint: HttpUrl, webhook_taskid: str
@@ -242,6 +250,7 @@ async def persons_bulk_background(
                 "X-Task-Id": webhook_taskid,
                 "X-Enriched-Total": str(enriched_total),
             },
+            timeout=settings.max_requests_seconds,
         )
         r.raise_for_status()
         log.debug(f"Endpoint {webhook_endpoint} " + f"answered: {r.json()}" if r.text else "didn't answer")
@@ -276,10 +285,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 person_request_ta.validate_python(person)
             except json.JSONDecodeError as e:
                 log.debug(f"JSON malformed: {e}")
-                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
-            except ValidationError:
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA) from e
+            except ValidationError as e:
                 log.debug(f"invalid data: {person}")
-                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA) from e
 
             ar_status = None
 
@@ -310,23 +319,24 @@ async def person_optout(person: Person) -> bool:
     """
     if not ar.cache:
         raise HTTPException(status_code=503, detail="Cache is not available")
-    p_c = await ar.cache.get(sha256(person["email"].encode("utf-8")).hexdigest())
+    person_email_hash = sha256(person["email"].encode("utf-8")).hexdigest()
+    p_c = await ar.cache.get(person_email_hash)
     if p_c:
         p = json.loads(p_c)
         if p["OptOut"]:
             return True
         elif match_name(person["name"], p["name"], fuzzy=False):
-            await ar.cache.delete(sha256(person["email"].encode("utf-8")).hexdigest())
+            await ar.cache.delete(person_email_hash)
         else:
-            return HTTPException(status_code=400, detail="Name does not match")
+            raise HTTPException(status_code=400, detail="Name does not match")
 
     # hash to avoid storing personal data
-    person = {
+    opted_out_person = {
         "name": sha256(person["name"].encode("utf-8")).hexdigest(),
-        "email": "donotdigme@yopmail.com",
+        "email": sha256(person["email"].encode("utf-8")).hexdigest(),
         "OptOut": True,
     }
-    await ar.cache.set(sha256(person["email"].encode("utf-8")).hexdigest(), json_dumps(person))
+    await ar.cache.set(person_email_hash, json_dumps(opted_out_person))
     return True
 
 
@@ -359,7 +369,7 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
                 favicon,
             }
 
-    await cache_company.set(domain, json.dumps(jsonable_encoder(cmp)), ex=settings.cache_expiration_company)
+    await cache_company.set(domain, json_dumps(cmp), ex=settings.cache_expiration_company)
 
     return cmp
 
@@ -384,6 +394,7 @@ async def person_email_delete(email: EmailStr) -> bool:
         raise HTTPException(status_code=404, detail="Email not found")
     await ar.cache.delete(email_hash)
     return True
+
 
 @router.delete("/person", tags=("person", "GDPR"))
 async def person_delete() -> bool:

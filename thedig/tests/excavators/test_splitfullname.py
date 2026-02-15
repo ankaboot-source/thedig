@@ -40,9 +40,9 @@ def test_split_fullname_no_domain():
 
 
 def test_split_fullname_invalid_input():
-    assert split_fullname("123") == None
-    assert split_fullname("") == None
-    assert split_fullname(" ") == None
+    assert split_fullname("123") is None
+    assert split_fullname("") is None
+    assert split_fullname(" ") is None
 
 
 @pytest.mark.parametrize(
