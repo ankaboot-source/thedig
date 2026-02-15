@@ -80,8 +80,11 @@ Then open http://localhost:8080/docs
 ```bash
 uv venv .venv
 uv sync --frozen --extra vision
+uv run patchright install chrome
 uv run uvicorn main:app --reload
 ```
+
+`patchright install chrome` is required for advanced anti-bot targets that need browser automation.
 
 ## MCP server
 
