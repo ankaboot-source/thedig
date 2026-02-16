@@ -2,6 +2,7 @@
 
 # json
 import json
+import re
 from hashlib import sha256
 
 # types
@@ -33,13 +34,13 @@ from pydantic import EmailStr, Field, HttpUrl
 from ..excavators.archaeology import Archeologist, JSONorNoneResponse
 from ..excavators.bio import find_jobtitle
 from ..excavators.company import Company, DomainName, company_by_domain
-from ..excavators.domainlogo import find_favicon, guess_country
+from ..excavators.domainlogo import find_favicon
 from ..excavators.gravatar import gravatar
 
 # service
 from ..excavators.linkedin import SearchChain, linkedin_profile_picture
 from ..excavators.splitfullname import split_fullname
-from ..excavators.utils import match_name
+from ..excavators.utils import guess_country, match_name
 from ..excavators.vision import SocialNetworkMiner
 
 # config
@@ -59,6 +60,7 @@ from .websocketmanager import manager as ws_manager
 
 MAX_REQUESTS_PER_SEC = {"times": settings.max_requests_times, "seconds": settings.max_requests_seconds}
 MAX_BULK = 1000
+RE_WORKSFOR_TAG = re.compile(r"\bat\s+@(?P<company>[A-Za-z][A-Za-z0-9_.-]{1,})", re.IGNORECASE)
 
 # init fast api
 router = APIRouter()
@@ -126,7 +128,7 @@ async def email_to_image(email) -> Person:
     )
 
 
-if hasattr(settings, "google_credentials"):
+if settings.google_credentials:
 
     @ar.register(field="image")
     async def image(p: dict) -> Person:
@@ -170,7 +172,7 @@ async def social(p: dict) -> Person:
     return snm.person
 
 
-@ar.register(field="description", insert=("jobTitle",), enrich=False)
+@ar.register(field="description", update=("worksFor",), insert=("jobTitle",), enrich=False)
 async def bio(description: str | None = None) -> Person:
     desc: set[str] = (
         {
@@ -179,17 +181,22 @@ async def bio(description: str | None = None) -> Person:
         if type(description) is str
         else description
     )
-    job_title = {}
+    mined_profile = {}
     jt = set()
+    companies = set()
     for d in desc:
         jobtitle = find_jobtitle(d)
         if jobtitle:
             jt |= jobtitle
+        companies.update(match.group("company") for match in RE_WORKSFOR_TAG.finditer(d))
 
     if jt:
-        job_title["jobTitle"] = jt
+        mined_profile["jobTitle"] = jt
 
-    return job_title
+    if companies:
+        mined_profile["worksFor"] = companies
+
+    return mined_profile
 
 
 @ar.register(field="name", update=("givenName", "familyName"), enrich=False)

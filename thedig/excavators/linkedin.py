@@ -677,6 +677,10 @@ class SearchChain(metaclass=Singleton):
             self.engines.append(Brave(token=settings.brave_api_key))
 
     def search(self, name: str, query: str):
+        if not self.engines:
+            log.warning("No LinkedIn search engine configured; skipping LinkedIn lookup")
+            return None
+
         success = False
         for engine in self.engines:
             try:
@@ -691,5 +695,6 @@ class SearchChain(metaclass=Singleton):
                 log.error(f"{engine.__class__.__name__} failed with error: {e}")
 
         if not success:
-            failed_engines = "All search engines have failed."
-            raise Exception(failed_engines)
+            log.warning("All configured search engines have failed; skipping LinkedIn lookup")
+
+        return None

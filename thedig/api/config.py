@@ -45,7 +45,7 @@ def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS
 
 class Settings(BaseSettings):
     app_name: str = "TheDig"
-    google_credentials: FilePath | None
+    google_credentials: FilePath | None = None
     bing_api_key: str | None = None
     bing_customconfig: str | None = None
     google_vertexai_projectid: str | None = None
@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     cache_redis_db_company: int = 2
     cache_expiration_company: int = 60 * 60 * 24 * 30  # 30 days
     cache_expiration_person: int = 60 * 60 * 24 * 1  # 1 day
-    server_port: int = "8080"
+    server_port: int = 8080
     api_keys: list[str]
     api_key_name: str
     public_email_providers: set[str] | None = get_public_email_providers()

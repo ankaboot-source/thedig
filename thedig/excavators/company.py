@@ -71,11 +71,13 @@ def _detect_patchright_chrome_path() -> str | None:
     return None
 
 
-def _http_fetch(url: str, proxy=None) -> WebResponse | None:
+def _http_fetch(url: str, proxy=None, headers: dict[str, str] | None = None) -> WebResponse | None:
     request_kwargs: dict[str, object] = {
         "timeout": QUERY_TIMEOUT,
         "impersonate": os.getenv("THEDIG_CURL_IMPERSONATE", "chrome"),
     }
+    if headers:
+        request_kwargs["headers"] = headers
     proxy_server = _proxy_server(proxy)
     if proxy_server:
         request_kwargs["proxy"] = proxy_server
@@ -378,6 +380,24 @@ async def company_by_domain(domain: DomainName, proxy=None) -> Company | None:
             else:
                 cmp[field] = value
 
+    if domain[-3:].lower() == ".fr":
+        societe_query = (
+            cmp.get("legalName")
+            or cmp.get("name")
+            or (web_cmp.get("legalName") if web_cmp else None)
+            or (web_cmp.get("name") if web_cmp else None)
+        )
+        if isinstance(societe_query, str) and societe_query.strip():
+            societe_cmp = await company_from_societecom(societe_query.strip(), domain=domain, proxy=proxy)
+            if societe_cmp:
+                for field, value in societe_cmp.items():
+                    if type(value) is set and len(value) > 1:
+                        cmp[field] = cmp.get(field, set()) | remove_shorter_duplicates(value)
+                    elif field in cmp:
+                        continue
+                    else:
+                        cmp[field] = value
+
     return cmp
 
 
@@ -395,9 +415,6 @@ async def company_from_web(domain: DomainName, proxy=None) -> Company | None:
             await company_from_linkedin(name, domain, proxy),
         )
     )
-    if domain[-3:].lower() == ".fr":
-        cmps.append(await company_from_societecom(name))
-
     for cmp in cmps:
         if not cmp:
             continue
@@ -413,10 +430,74 @@ async def company_from_web(domain: DomainName, proxy=None) -> Company | None:
     return company
 
 
-async def find_company_societecom(name: str, proxy=None) -> HttpUrl | None:
+def _societe_pick_hit(hits: list[dict], name: str, domain: str | None) -> dict | None:
+    name_norm = normalize(name, replace={" ": "", "-": "", ".": ""})
+    domain_root = ""
+    if domain:
+        parts = domain.split(".")
+        if len(parts) > 1:
+            domain_root = normalize(parts[-2], replace={" ": "", "-": "", ".": ""})
+
+    best: tuple[int, dict] | None = None
+
+    for hit in hits:
+        if not isinstance(hit, dict):
+            continue
+        if hit.get("code") != "c":
+            continue
+        url = str(hit.get("url") or "")
+        if not url.startswith("/societe/"):
+            continue
+
+        label = str(hit.get("label") or "")
+        alt = str(hit.get("alt") or "")
+        label_norm = normalize(label, replace={" ": "", "-": "", ".": ""})
+        alt_norm = normalize(alt, replace={" ": "", "-": "", ".": "", ";": ""})
+
+        score = 0
+        if label_norm == name_norm:
+            score += 120
+        elif name_norm and label_norm and name_norm in label_norm:
+            score += 70
+        elif name_norm and label_norm and label_norm in name_norm:
+            score += 50
+
+        if name_norm and alt_norm and name_norm in alt_norm:
+            score += 25
+
+        if domain_root:
+            if label_norm == domain_root:
+                score += 80
+            elif domain_root in label_norm:
+                score += 30
+            elif alt_norm and domain_root in alt_norm:
+                score += 10
+
+        # short queries like "sfr" are frequently ambiguous; require exact label match
+        if len(name_norm) < 4 and label_norm != name_norm:
+            score -= 60
+
+        if best is None or score > best[0]:
+            best = (score, hit)
+
+    if not best:
+        return None
+
+    if best[0] < 50:
+        return None
+
+    return best[1]
+
+
+async def find_company_societecom(name: str, domain: str | None = None, proxy=None) -> HttpUrl | None:
+    query = name.strip()
+    if not query:
+        return None
+
     r = _http_fetch(
-        f"https://www.societe.com/cgi-bin/liste?ori=avance&nom={urllib.parse.quote(name)}&exa=on",
+        f"https://www.societe.com/cgi-bin/finder-api?q={urllib.parse.quote(query)}",
         proxy=proxy,
+        headers={"accept": "application/json"},
     )
     if not r:
         return None
@@ -425,25 +506,31 @@ async def find_company_societecom(name: str, proxy=None) -> HttpUrl | None:
         log.error(f"Couldn't get results for {r.url}: {r.status_code} : {r.reason}")
         return None
 
-    html = _parse_html(r.text)
-    links = html.select("a.ResultBloc__link__content")
-    if not links:
-        log.warning(f"No results for that name: {name}")
-        return None
-    # there is at least 6 links when only one result
-    if len(links) > 6:
-        log.warning(f"More than one company found with that name: {name}")
+    try:
+        payload = json.loads(r.text)
+    except json.JSONDecodeError as e:
+        log.error(f"Societe finder-api JSON decode failed: {e}")
         return None
 
-    href = links[0].get("href")
-    if not href:
+    hits = payload.get("hits") if isinstance(payload, dict) else None
+    if not isinstance(hits, list) or not hits:
+        log.warning(f"No results for that name: {name}")
+        return None
+
+    best_hit = _societe_pick_hit(hits, name=name, domain=domain)
+    if not best_hit:
+        log.warning(f"No eligible Societe company hit for: {name}")
+        return None
+
+    href = str(best_hit.get("url") or "")
+    if not href.startswith("/societe/"):
         return None
 
     return f"https://www.societe.com{href}"
 
 
-async def company_from_societecom(name: str, proxy=None) -> Company | None:
-    url = await find_company_societecom(name)
+async def company_from_societecom(name: str, domain: str | None = None, proxy=None) -> Company | None:
+    url = await find_company_societecom(name, domain=domain, proxy=proxy)
 
     if not url:
         return None

@@ -5,8 +5,25 @@ Person Types
 import re
 
 from fastapi.exceptions import HTTPException
-from pydantic import EmailStr, HttpUrl, TypeAdapter, constr
+from pydantic import EmailStr, HttpUrl, TypeAdapter, ValidationError, constr
 from typing_extensions import TypedDict
+
+__all__ = [
+    "Person",
+    "PersonRequest",
+    "PersonResponse",
+    "ValidationError",
+    "verify_mandatory_fields",
+    "person_set_field",
+    "dict_to_person",
+    "person_unset_void",
+    "person_deduplicate",
+    "is_pure_iterable",
+    "exc_to_person",
+    "person_ta",
+    "person_request_ta",
+    "person_response_ta",
+]
 
 RE_COUNTRY = r"^[A-Z]{2}$"
 RE_LANGUAGE = r"^[a-z]{2}$"
