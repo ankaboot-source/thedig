@@ -21,6 +21,7 @@ ENV PYTHONDONTWRITEBYTECODE=True \
     PYTHONUNBUFFERED=True \
     PYTHONIOENCODING=utf-8 \
     UV_LINK_MODE=copy \
+    LOG_FILEPATH=/tmp/thedig.log \
     PATH=/app/.venv/bin:$PATH:/home/appuser/.local/bin
 
 # Copy local code to the container image.
