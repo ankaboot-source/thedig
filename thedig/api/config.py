@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     proxycurl_api_key: str | None = None
     github_token: str | None = None
     log_level: str | None = "INFO"
-    log_filepath: str | None = "thedig.log"
+    log_filepath: str | None = None
     redis_username: str | None = None
     redis_password: str | None = None
     redis_host: str
