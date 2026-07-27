@@ -75,6 +75,57 @@ Download it and:
 ```
 Then open http://localhost:8080/docs
 
+### Launch with `uv`
+
+```bash
+uv venv .venv
+uv sync --frozen --extra vision
+uv run patchright install chrome
+uv run uvicorn main:app --reload
+```
+
+`patchright install chrome` is required for advanced anti-bot targets that need browser automation.
+
+## MCP server
+
+An MCP server is available to call TheDig from AI chatbots.
+
+1. Start TheDig API (Docker or `uv run uvicorn main:app --reload`).
+2. Export API settings used by the MCP process:
+
+```bash
+export THEDIG_API_BASE_URL="http://localhost:8080"
+export THEDIG_API_KEY="CHANGE-THIS"
+export THEDIG_API_KEY_HEADER="X-API-KEY"
+```
+
+3. Run the MCP server over stdio:
+
+```bash
+uv run thedig-mcp
+```
+
+Available MCP tool:
+- `enrich_person_email(email, name?)`: enriches a person from an email. If `name` is omitted, it is inferred from the email local-part.
+
+Example MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "thedig": {
+      "command": "uv",
+      "args": ["run", "thedig-mcp"],
+      "env": {
+        "THEDIG_API_BASE_URL": "http://localhost:8080",
+        "THEDIG_API_KEY": "CHANGE-THIS",
+        "THEDIG_API_KEY_HEADER": "X-API-KEY"
+      }
+    }
+  }
+}
+```
+
 ## 🤝 How to contribute
 You're welcome! First, have a look on issues open and closed. If nothing is related to your needs, either open an issue or [fork, create a branch and submit your PR](https://docs.github.com/en/get-started/quickstart/contributing-to-projects).
 ### Launch in developer mode

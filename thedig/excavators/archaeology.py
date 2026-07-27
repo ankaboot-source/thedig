@@ -7,15 +7,12 @@ from functools import partial, update_wrapper
 from hashlib import sha256
 from inspect import signature
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger as log
-from pydantic import AnyUrl
 
 from ..api.person import Person, dict_to_person, exc_to_person, person_set_field, person_ta
-from .utils import normalize
 
 RE_SET = re.compile(r"(\s|^)set\W")
 DEFAULT_CACHE_EXPIRATION = 60 * 60  # 1 hour

@@ -11,7 +11,7 @@ from thedig.excavators.utils import normalize
 log = logging.getLogger(__name__)
 
 RE_WHITESPACE = re.compile(r"\s+")
-RE_ALPHA = re.compile(r"\w+\-?'?")
+RE_ALPHA = re.compile(r"[^\W\d_]+(?:[-'][^\W\d_]+)?", re.UNICODE)
 
 FAMILYNAME_SEPARATOR = {
     "إبن",
@@ -130,6 +130,7 @@ JOBTITLES_ABBRV = {
     "Ing": "Engineer",
     "Eng": "Engineer",
     "Engr": "Engineer",
+    "PhD": "Doctor",
     "Phd": "Doctor",
     "Pr": "Professor",
     "Prof": "Professor",
@@ -142,6 +143,8 @@ BUSINESS_SEPARATOR = {
     "de",
     "d",  # only works if ' are removed
 }
+
+BLOCKED_NAMES = {name.casefold() for name in CIVILITY | ROLE_NAMES}
 
 
 def order(givenname: str, familyname: str) -> dict:
@@ -158,56 +161,92 @@ def order(givenname: str, familyname: str) -> dict:
 
 
 def is_company(name: str, domain: str) -> bool:
+    normalized_name = normalize(name)
     for sep in BUSINESS_SEPARATOR:
-        if name.startswith(sep):
-            name = name.removeprefix(sep)
+        normalized_sep = normalize(sep)
+        if normalized_name.startswith(normalized_sep):
+            normalized_name = normalized_name.removeprefix(normalized_sep)
             break
 
-    _name = normalize(name)
+    domain_parts = domain.split(".")
+    domain_root = normalize(domain_parts[-2] if len(domain_parts) > 1 else domain)
+    normalized_domain = normalize(domain)
+    normalized_registrable_domain = normalize(".".join(domain_parts[-2:]))
 
-    return _name in (domain.split(".")[-2], domain, ".".join(domain.split(".")[-2:]))
+    return (
+        normalized_name in (domain_root, normalized_domain, normalized_registrable_domain)
+        or domain_root in normalized_name
+    )
 
 
 def _split_fullname(fullname: str) -> dict:
-    # needs to look like a word somehow
-    matched = re.match(RE_ALPHA, fullname)
-    if not matched:
+    fullname = RE_WHITESPACE.sub(" ", fullname).strip()
+    if not fullname or not re.match(RE_ALPHA, fullname):
         return None
-    # fullname = matched.group(0)
 
-    # minimum to guess length is 4
-    # needs a space somewhere in between
-    if len(fullname) < 4 or " " not in fullname.strip():
+    if not any(char.isalpha() for char in fullname):
+        return None
+
+    # one token can still be a valid given name
+    if " " not in fullname:
+        if len(fullname) < 2:
+            return None
         return {
             "givenName": fullname,
         }
 
     # e.g Familyname, First Name
-    comma_format = fullname.split(",")
-    if len(comma_format) == 2 and comma_format[0][0].isupper():
+    comma_format = [part.strip() for part in fullname.split(",")]
+    if len(comma_format) == 2 and all(comma_format):
         return {
             "familyName": comma_format[0],
             "givenName": comma_format[1],
         }
 
-    # normalize white spaces then split into words
-    fullname = RE_WHITESPACE.sub(" ", fullname).strip()
     words = fullname.split(" ")
+
+    # civility prefixes are not part of the name itself
+    while words and words[0].removesuffix(".") in CIVILITY:
+        words.pop(0)
+    if not words:
+        return None
+
+    # suffixes such as PhD are not part of family name
+    while len(words) > 2:
+        trailing = words[-1].removesuffix(".")
+        trailing_norm = trailing[:1].upper() + trailing[1:].lower() if trailing else trailing
+        if trailing_norm in JOBTITLES_ABBRV:
+            words.pop()
+            continue
+        break
 
     # eg. Dr. First Name FamilyName
     jobtitle = None
-    if len(words[0]) > 1 and len(words[0]) < 5:
+    if words and 1 < len(words[0]) < 5:
         # if last caracter end with a '.' we remove it for test purpose
         _jobtitle = words[0] if words[0][-1] != "." else words[0][:-1]
-        if _jobtitle in JOBTITLES_ABBRV:
-            jobtitle = _jobtitle
+        normalized_jobtitle = _jobtitle[:1].upper() + _jobtitle[1:].lower() if _jobtitle else _jobtitle
+        if normalized_jobtitle in JOBTITLES_ABBRV:
+            jobtitle = normalized_jobtitle
             words.pop(0)
 
-    # e.g givenName FamilyName
-    # too much fake positive about FamilyName
-    if len(words) == 2:
+    if not words:
+        return None
+
+    if len(words) == 1:
         result = {
-            "givenName": order(words[0], words[1])["givenName"],
+            "givenName": words[0],
+        }
+        if jobtitle:
+            result["jobTitle"] = jobtitle
+        return result
+
+    # e.g givenName FamilyName
+    if len(words) == 2:
+        ordered = order(words[0], words[1])
+        result = {
+            "givenName": ordered["givenName"],
+            "familyName": ordered["familyName"],
         }
         if jobtitle:
             result["jobTitle"] = jobtitle
@@ -215,7 +254,7 @@ def _split_fullname(fullname: str) -> dict:
 
     # eg. First name FAMILY NAME (or the opposite)
     givenname = words[0]
-    familyname = None
+    familyname = words[-1]
 
     last_word_upper = words[-1].isupper()
     first_word_upper = words[0].isupper()
@@ -223,11 +262,9 @@ def _split_fullname(fullname: str) -> dict:
     if first_word_upper ^ last_word_upper:
         # trick to reverse FAMILY NAME Given Name
         isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(f)
-        for i in range(len(words)):
-            if isfamily(words[i]):
-                break
-        givenname = " ".join(words[:i])
-        familyname = " ".join(words[i:])
+        split_index = next((index for index, word in enumerate(words) if isfamily(word)), 1)
+        givenname = " ".join(words[:split_index])
+        familyname = " ".join(words[split_index:])
         if first_word_upper:
             givenname, familyname = familyname, givenname
     else:
@@ -237,6 +274,9 @@ def _split_fullname(fullname: str) -> dict:
                 givenname = " ".join(words[:i])
                 familyname = " ".join(words[i:])
                 break
+        else:
+            givenname = " ".join(words[:-1])
+            familyname = words[-1]
 
     if givenname:
         return {
@@ -247,6 +287,9 @@ def _split_fullname(fullname: str) -> dict:
 
 
 def split_fullname(fullname: str, domain: str = None) -> dict:
+    if not fullname or not fullname.strip() or fullname.strip().casefold() in ROLE_NAMES:
+        return None
+
     if domain and is_company(fullname, domain):
         return None
 
@@ -262,7 +305,7 @@ def split_fullname(fullname: str, domain: str = None) -> dict:
             splitted.pop(k)
         elif domain and is_company(v, domain):
             splitted.pop(k)
-        elif v.lower() in CIVILITY | ROLE_NAMES:
+        elif v.casefold() in BLOCKED_NAMES:
             splitted.pop(k)
 
     return splitted if splitted.get("givenName") else None

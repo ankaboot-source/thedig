@@ -186,10 +186,12 @@ def get_socialprofile(url, sn, name, params=REQUESTS_PARAM, session=None, retry=
     ratio_ogtitle = fuzz.partial_token_sort_ratio(name, og_title)
     title = title.string or og_title or ""
     if ratio_title < TOKEN_RATIO and ratio_ogtitle < TOKEN_RATIO and name not in title:
-        log.debug(f"Name doesn't match with page title. \
+        log.debug(
+            f"Name doesn't match with page title. \
                 Name: {name}, URL: {url}, \
                     Page title: {title} - {ratio_title}, \
-                        OG Title {og_title} - {ratio_ogtitle}")
+                        OG Title {og_title} - {ratio_ogtitle}"
+        )
         return False, sn
 
     return soup, sn
@@ -541,12 +543,23 @@ class SocialNetworkMiner:
         return {idr, idr.replace(".", "")}
 
     def _generate_identifier_from_email(self) -> set[str]:
-        idr_email = "".join(filter(str.isalnum, self._person["email"].split("@")[0].split("+")[0]))
-        idr = {idr_email, idr_email.replace(".", "")}
-        # useful only if really different from name
-        # othearise, it gives too much false positive
-        idr = set() if any(fuzz.partial_token_sort_ratio(i, self._person["name"]) > 81 for i in idr) else idr
-        return idr
+        local_part, domain = self._person["email"].split("@", 1)
+        local_id = "".join(filter(str.isalnum, local_part.split("+")[0]))
+
+        candidates = {
+            local_id,
+            local_id.replace(".", ""),
+        }
+
+        domain_root = "".join(filter(str.isalnum, domain.split(".")[0]))
+        if local_id and domain_root and local_id in domain_root and domain_root != local_id:
+            candidates.add(domain_root)
+
+        return {
+            identifier
+            for identifier in candidates
+            if len(identifier) >= 3 and fuzz.partial_token_sort_ratio(identifier, self._person["name"]) <= 81
+        }
 
 
 if __name__ == "__main__":

@@ -10,10 +10,8 @@ import time
 import unicodedata
 from abc import ABC, abstractmethod
 from html import unescape
-from typing import ClassVar, Literal, Optional
+from typing import ClassVar, Literal
 
-import deepface
-import face_recognition
 import jwt
 
 # from curl_cffi import requests
@@ -22,7 +20,7 @@ from loguru import logger as log
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 # needed for memory sharing between threads
-from ..api.person import Person, dict_to_person
+from ..api.person import dict_to_person
 from .ISO3166 import ISO3166
 from .utils import match_name
 
@@ -36,7 +34,10 @@ RE_LINKEDIN_URL = re.compile(
 RE_LINKEDIN_NAME_DESCRIPTION = re.compile(r"<strong>([^<]+)</strong>.*<strong>([^<]+)</strong>", re.U)
 
 RE_LINKEDIN_INFOS_DESCRIPTION = re.compile(
-    r"^(?P<description>.*?)(?: · Experience: (?P<worksFor>.+?)(?: · Education: (.+?))? · Location: (?P<workLocation>.*?) · (?: · \d+\+ connections on LinkedIn)?)",
+    (
+        r"^(?P<description>.*?)(?: · Experience: (?P<worksFor>.+?)(?: · Education: (.+?))?"
+        r" · Location: (?P<workLocation>.*?) · (?: · \d+\+ connections on LinkedIn)?)"
+    ),
     re.U,
 )
 
@@ -44,31 +45,40 @@ LINKEDIN_DESCRIPTION = {
     "en": {
         "begin": "View ",
         "end": "’s profile on LinkedIn, a professional community of 1 billion members",
-        "re": RE_LINKEDIN_INFOS_DESCRIPTION
+        "re": RE_LINKEDIN_INFOS_DESCRIPTION,
     },
     "fr": {
         "begin": "Consultez le profil de ",
         "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres",
-         "re": re.compile(
-               r"^(?P<description>.*?)(?: · Expérience : (?P<worksFor>.+?)(?: · Formation : (.+?))? · Lieu : (?P<workLocation>.*?) · (?: · \d+\+ relations sur LinkedIn)?)",
-               re.U,
-               )
+        "re": re.compile(
+            (
+                r"^(?P<description>.*?)(?: · Expérience : (?P<worksFor>.+?)(?: · Formation : (.+?))?"
+                r" · Lieu : (?P<workLocation>.*?) · (?: · \d+\+ relations sur LinkedIn)?)"
+            ),
+            re.U,
+        ),
     },
     "de": {
         "begin": "Sehen Sie sich das Profil von ",
         "end": " auf LinkedIn, einer professionellen Community mit mehr als 1 Milliarde Mitgliedern, an",
         "re": re.compile(
-               r"^(?P<description>.*?)(?: · Berufserfahrung: (?P<worksFor>.+?)(?: · Ausbildung: (.+?))? · Standort: (?P<workLocation>.*?) · (?: · \d+\+ Kontakte auf LinkedIn)?)",
-               re.U,
-               )
+            (
+                r"^(?P<description>.*?)(?: · Berufserfahrung: (?P<worksFor>.+?)(?: · Ausbildung: (.+?))?"
+                r" · Standort: (?P<workLocation>.*?) · (?: · \d+\+ Kontakte auf LinkedIn)?)"
+            ),
+            re.U,
+        ),
     },
     "ch": {
         "begin": "Sehen Sie sich das Profil von ",
         "end": " auf LinkedIn, einer professionellen Community mit mehr als 1 Milliarde Mitgliedern, an",
         "re": re.compile(
-               r"^(?P<description>.*?)(?: · Berufserfahrung: (?P<worksFor>.+?)(?: · Ausbildung: (.+?))? · Standort: (?P<workLocation>.*?) · (?: · \d+\+ Kontakte auf LinkedIn)?)",
-               re.U,
-               )
+            (
+                r"^(?P<description>.*?)(?: · Berufserfahrung: (?P<worksFor>.+?)(?: · Ausbildung: (.+?))?"
+                r" · Standort: (?P<workLocation>.*?) · (?: · \d+\+ Kontakte auf LinkedIn)?)"
+            ),
+            re.U,
+        ),
     },
 }
 
@@ -77,22 +87,23 @@ LINKEDIN_TRAILING_DESCRIPTION = (" ...", ".")
 REQUESTS_TIMEOUT = 3
 PROXYCURL_PICTURE_ENDPOINT = "https://nubela.co/proxycurl/api/linkedin/person/profile-picture"
 
+
 def linkedin_profile_picture(url: HttpUrl, api_key: str, proxy=None) -> HttpUrl:
     match = RE_LINKEDIN_URL.match(str(url))
     if not match:
         log.debug(f"Not a valid LinkedIn profile URL: {url}")
         return
-    linkedin_url = f"https://www.linkedin.com/in/{match.group("identifier")}"
+    linkedin_url = f"https://www.linkedin.com/in/{match.group('identifier')}"
     try:
         r = requests.get(
             PROXYCURL_PICTURE_ENDPOINT,
             params={"linkedin_person_profile_url": linkedin_url},
             timeout=REQUESTS_TIMEOUT,
             headers={"Authorization": f"Bearer {api_key}"},
-            proxies={"https": proxy}
+            proxies={"https": proxy} if proxy else None,
         )
         log.debug(r.text)
-    except requests.RequestsException as e:
+    except requests.RequestException as e:
         log.debug(e)
         return
 
@@ -118,7 +129,7 @@ def country_from_url(linkedin_url: str) -> str:
         return ISO3166[match["countrycode"].upper()]
 
 
-def parse_linkedin_title(title: str, name: str = None) -> dict:
+def parse_linkedin_title(title: str, name: str | None = None) -> dict:
     """parse LinkedIn Title that has this form
         Full Name - Title - Company | LinkedIn
         and sometimes (Google only):
@@ -138,7 +149,7 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
         return result
 
     title_ = title.split(" | ")
-    #actually, LinkedIn separator is not - but –
+    # actually, LinkedIn separator is not - but –
     full_title = title_[0].replace(" – ", " - ").split(" - ")
     if len(full_title) < 2:
         log.debug("This is not a LinkedIn profile title: wrong separator or too short")
@@ -169,15 +180,16 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
 def parse_linkedin_description(description, country="en") -> dict:
     person = {}
 
+    if not description:
+        return person
+
     html_matches = re.match(RE_LINKEDIN_NAME_DESCRIPTION, description)
     if html_matches:
-        names = set(html_matches.groups())
-        if len(names) == 2:
-            person["familyName"] = names.pop()
-            person["givenName"] = names.pop()
+        given_name, family_name = html_matches.groups()
+        if given_name and family_name:
+            person["givenName"] = given_name
+            person["familyName"] = family_name
             person["alternateName"] = f"{given_name} {family_name}"
-        elif len(names) == 1:
-            person["familyName"] = names.pop()
 
     # fallback to english
     if country not in LINKEDIN_DESCRIPTION:
@@ -195,13 +207,9 @@ def parse_linkedin_description(description, country="en") -> dict:
         person["description"] = description
         # add alternateName found in description
         if "alternateName" not in person:
-            description = (
-                description.replace("<strong>", "")
-                .replace("</strong>", "")
-            )
+            description = description.replace("<strong>", "").replace("</strong>", "")
             person["alternateName"] = description[
-                description.find(LINKEDIN_DESCRIPTION[country]["begin"])
-                + len(LINKEDIN_DESCRIPTION[country]["begin"]) :
+                description.find(LINKEDIN_DESCRIPTION[country]["begin"]) + len(LINKEDIN_DESCRIPTION[country]["begin"]) :
             ]
         person["description"] = description.replace(LINKEDIN_DESCRIPTION[country]["begin"], "")
         person["description"] = person["description"].removesuffix(person["alternateName"])
@@ -214,17 +222,32 @@ def parse_linkedin_description(description, country="en") -> dict:
 
     return person
 
-def _remote_image_array(url):
-    image_f = requests.get(
-        url,
-        stream=True,
-        timeout=REQUESTS_TIMEOUT
-    )
+
+def _load_face_recognition_module():
+    try:
+        import face_recognition
+    except ImportError as e:
+        msg = "face-recognition is required for face matching"
+        raise RuntimeError(msg) from e
+    return face_recognition
+
+
+def _remote_image_array(url: str):
+    face_recognition = _load_face_recognition_module()
+    try:
+        image_f = requests.get(
+            url,
+            stream=True,
+            timeout=REQUESTS_TIMEOUT,
+        )
+    except requests.RequestException as e:
+        raise ValueError(f"Failed to get image from {url}") from e
     if not image_f.ok:
-        failed_request = f"Failed to get image from {image}: {image_f.status_code}"
+        failed_request = f"Failed to get image from {url}: {image_f.status_code}"
         raise ValueError(failed_request)
-    image_f.raw.decode_contente = True
+    image_f.raw.decode_content = True
     return face_recognition.load_image_file(image_f.raw)
+
 
 class LinkedInProfile(BaseModel):
     url: HttpUrl
@@ -255,6 +278,7 @@ class LinkedInProfile(BaseModel):
         self.parse_description()
         self.parse_url()
         self.clean_image()
+        return self
 
     def match_url(self):
         self.match = RE_LINKEDIN_URL.match(str(self.url))
@@ -268,8 +292,9 @@ class LinkedInProfile(BaseModel):
             # we upsert self.workLocation if None
             # or given by the search engine if it's not the same as the country
             # Country names like USA, UAE need to be checked as an acronym too
+            country_acronym = "".join(filter(str.isupper, self.country))
             if not self.workLocation or (
-                self.country not in self.workLocation and filter(str.isupper, self.country) not in self.workLocation
+                self.country not in self.workLocation and country_acronym not in self.workLocation
             ):
                 self.workLocation = self.country
 
@@ -282,9 +307,11 @@ class LinkedInProfile(BaseModel):
         self.identifier = self.match["identifier"]
 
     def parse_description(self):
+        if not self.description:
+            return
         infos = parse_linkedin_description(description=self.description, country=self.match["countrycode"])
         if infos:
-            if infos["alternateName"] == self.name:
+            if infos.get("alternateName") == self.name:
                 del infos["alternateName"]
             self.__dict__.update(infos)
 
@@ -400,45 +427,51 @@ class Search(ABC):
             )
 
             if worksFor and profile.worksFor and match_name(worksFor, profile.worksFor, acronym=True):
-                self.persons.insert(person)
+                self.persons.insert(0, person)
             else:
                 self.persons.append(person)
         return self.persons
 
     def face_match(self, image: HttpUrl, deepface_fallback=True):  # noqa: FBT002
+        try:
+            face_recognition = _load_face_recognition_module()
+        except RuntimeError as e:
+            log.warning(e)
+            return []
+
         matches = []
 
         original_face_img = _remote_image_array(str(image))
-        original_face = face_recognition.face_encodings(
-            original_face_img
-        )[0]
+        original_face = face_recognition.face_encodings(original_face_img)[0]
 
         for person in self.persons:
-            if not hasattr(person, "image"):
+            if "image" not in person:
                 continue
             profile_face = face_recognition.face_encodings(_remote_image_array(str(person["image"])))
-            if True in face_recognition.compare_faces(
-                [original_face],
-                profile_face
-            )[0]:
+            if True in face_recognition.compare_faces([original_face], profile_face)[0]:
                 matches.append(person)
 
         if matches or not deepface_fallback:
             return matches
 
+        try:
+            from deepface import DeepFace
+        except Exception as e:
+            log.warning(f"DeepFace fallback is unavailable: {e}")
+            return matches
+
         # ok let's try deepface now
         for person in self.persons:
-            if not hasattr(person, "image"):
+            if "image" not in person:
                 continue
-            if deepface.verify(
+            if DeepFace.verify(
                 img1_path=original_face_img,
-                img2_path=_remote_image_array(str(person["image"]))
-                )["verified"]:
+                img2_path=_remote_image_array(str(person["image"])),
+            )["verified"]:
                 matches.append(person)
-                break # deepface is costly, so only one match is enough
+                break
 
         return matches
-
 
 
 class GoogleVertexAI(Search):
@@ -493,6 +526,7 @@ class GoogleVertexAI(Search):
                 "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
                 "assertion": signed_jwt,
             },
+            timeout=REQUESTS_TIMEOUT,
         )
 
         token_response.raise_for_status()
@@ -643,11 +677,15 @@ class SearchChain(metaclass=Singleton):
             self.engines.append(Brave(token=settings.brave_api_key))
 
     def search(self, name: str, query: str):
+        if not self.engines:
+            log.warning("No LinkedIn search engine configured; skipping LinkedIn lookup")
+            return None
+
         success = False
         for engine in self.engines:
             try:
                 log.debug(f"Trying {engine.__class__.__name__}...")
-                engine.search(name, query)
+                engine.search(query=query, name=name)
                 if not engine.results:
                     success = True
                     continue
@@ -657,5 +695,6 @@ class SearchChain(metaclass=Singleton):
                 log.error(f"{engine.__class__.__name__} failed with error: {e}")
 
         if not success:
-            failed_engines = "All search engines have failed."
-            raise Exception(failed_engines)
+            log.warning("All configured search engines have failed; skipping LinkedIn lookup")
+
+        return None

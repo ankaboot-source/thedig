@@ -38,7 +38,8 @@ def mock_jobtitles(monkeypatch):
     monkeypatch.setattr("thedig.excavators.bio.JOBTITLES", mock_titles)
 
 
-def test_find_jobtitle_with_mock(mock_jobtitles):
+@pytest.mark.usefixtures("mock_jobtitles")
+def test_find_jobtitle_with_mock():
     assert find_jobtitle("I am a Software Engineer") == {"Software Engineer"}
     assert find_jobtitle("Senior Software Engineer and Team Lead") == {"Senior Software Engineer", "Team Lead"}
     assert find_jobtitle("Data Scientist") is None

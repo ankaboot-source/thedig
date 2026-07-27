@@ -12,8 +12,7 @@ from bs4 import BeautifulSoup
 from curl_cffi import requests
 from loguru import logger as log
 
-from .ISO3166 import ISO3166
-from .utils import domain_to_urls, guess_country
+from .utils import domain_to_urls
 
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 
