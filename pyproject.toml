@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "beautifulsoup4>=4.14.3",
-    "cryptography>=46.0.5",
+    "cryptography>=48.0.1",
     "curl-cffi>=0.14.0",
     "fake-useragent>=2.2.0",
     "fastapi>=0.129.0",
