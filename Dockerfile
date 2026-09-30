@@ -10,6 +10,13 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir uv
 
+# System dependencies for headless Chromium (patchright excavators, issue #95)
+RUN apt-get update \
+    && pip install --no-cache-dir patchright \
+    && patchright install-deps chromium \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
 # Create a non-root user
 RUN useradd -m -s /bin/bash appuser
 
@@ -30,6 +37,14 @@ WORKDIR $APP_HOME
 COPY . $APP_HOME/
 
 RUN uv sync --frozen --no-dev --extra vision
+
+# Chromium for the patchright excavators, installed as appuser so it lands in
+# /home/appuser/.cache/ms-playwright where _detect_patchright_chrome_path()
+# finds it at runtime (issue #95: browser excavators were dead in the image)
+RUN patchright install chromium
+
+# Headed mode is unusable in-container (no X server)
+ENV THEDIG_PATCHRIGHT_HEADLESS=true
 
 EXPOSE 8080
 
