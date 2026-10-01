@@ -5,6 +5,7 @@ import pytest
 
 from thedig.excavators.company import (
     WebResponse,
+    _detect_patchright_chrome_path,
     _extract_linkedin_ld_json,
     _parse_html,
     _company_from_linkedin,
@@ -257,3 +258,29 @@ async def test_company_by_domain_french_telcos_live_integration(domain: str, exp
     combined_name = f"{company.get('name', '')} {company.get('legalName', '')}".casefold()
     assert expected_name_token in combined_name
     assert company.get("sameAs") or company.get("url")
+
+
+def test_detect_patchright_chrome_path_prefers_env_override(monkeypatch, tmp_path):
+    fake = tmp_path / "chrome"
+    fake.touch()
+    monkeypatch.setenv("THEDIG_PATCHRIGHT_CHROME_PATH", str(fake))
+
+    assert _detect_patchright_chrome_path() == str(fake)
+
+
+def test_detect_patchright_chrome_path_finds_cached_chromium(monkeypatch, tmp_path):
+    binary = tmp_path / ".cache" / "ms-playwright" / "chromium-1243" / "chrome-linux" / "chrome"
+    binary.parent.mkdir(parents=True)
+    binary.touch()
+    binary.chmod(0o755)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("THEDIG_PATCHRIGHT_CHROME_PATH", raising=False)
+
+    assert _detect_patchright_chrome_path() == str(binary)
+
+
+def test_detect_patchright_chrome_path_returns_none_when_missing(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("THEDIG_PATCHRIGHT_CHROME_PATH", raising=False)
+
+    assert _detect_patchright_chrome_path() is None

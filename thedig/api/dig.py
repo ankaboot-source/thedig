@@ -78,8 +78,8 @@ async def worksfor(email: EmailStr) -> Person:
     works_for = {"worksFor": set()}
     if domain not in settings.public_email_providers:
         company = await company_by_domain(domain, proxy=settings.proxy)
-        if company:
-            works_for["worksFor"].add(company["name"])
+        if company and (company_name := company.get("name")):
+            works_for["worksFor"].add(company_name)
     return works_for
 
 
