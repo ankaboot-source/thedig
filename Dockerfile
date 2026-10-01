@@ -3,7 +3,7 @@ FROM python:3.12-slim
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl git build-essential whois \
-    && pip install --no-cache-dir uv patchright==1.58.0 \
+    && pip install --no-cache-dir uv==0.9.26 patchright==1.58.0 \
     && patchright install-deps chromium \
     && apt-get autoremove -y \
     && apt-get clean \
