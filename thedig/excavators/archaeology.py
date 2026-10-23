@@ -135,7 +135,7 @@ class Archeologist:
                 log.debug(f"cache hit for {person['email']}")
                 return True, None, json.loads(person_c)
 
-        fields = list(person.keys() & self.fields)
+        fields = [field for field in self._ordered_elements if field in person]
         exc: dict = defaultdict(list)
 
         log.debug(f"excavating {fields} for {person}")

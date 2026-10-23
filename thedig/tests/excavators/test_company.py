@@ -8,6 +8,7 @@ from thedig.excavators.company import (
     _detect_patchright_chrome_path,
     _extract_linkedin_ld_json,
     _parse_html,
+    _playwright_proxy,
     _company_from_linkedin,
     company_from_societecom,
     find_company_societecom,
@@ -284,3 +285,34 @@ def test_detect_patchright_chrome_path_returns_none_when_missing(monkeypatch, tm
     monkeypatch.delenv("THEDIG_PATCHRIGHT_CHROME_PATH", raising=False)
 
     assert _detect_patchright_chrome_path() is None
+
+
+def test_playwright_proxy_none_returns_none():
+    assert _playwright_proxy(None) is None
+
+
+def test_playwright_proxy_plain_url():
+    assert _playwright_proxy("http://host:8080") == {"server": "http://host:8080"}
+
+
+def test_playwright_proxy_splits_credentials():
+    result = _playwright_proxy("http://user:p%40ss@host:8080")
+
+    assert result == {
+        "server": "http://host:8080",
+        "username": "user",
+        "password": "p@ss",
+    }
+
+
+def test_playwright_proxy_adds_http_scheme_for_bare_host():
+    assert _playwright_proxy("host:8080") == {"server": "http://host:8080"}
+
+
+def test_playwright_proxy_dict_uses_https_then_http():
+    assert _playwright_proxy({"https": "http://user:pass@secure:3128", "http": "http://plain:8080"}) == {
+        "server": "http://secure:3128",
+        "username": "user",
+        "password": "pass",
+    }
+    assert _playwright_proxy({"http": "http://plain:8080"}) == {"server": "http://plain:8080"}

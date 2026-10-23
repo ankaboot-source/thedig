@@ -345,18 +345,20 @@ class Search(ABC):
         self,
         endpoint: HttpUrl,
         method: HttpMethod,
-        headers: dict = {},
-        query_params: dict = {},
+        headers: dict | None = None,
+        query_params: dict | None = None,
         body: dict | None = None,
         proxy: str | None = None,
     ):
         self.endpoint = endpoint
-        self.headers = headers
-        self.query_params = query_params
+        self.headers = dict(headers) if headers is not None else {}
+        self.query_params = dict(query_params) if query_params is not None else {}
         self.body = body
         self.method = method
         self.proxy = proxy
         self.session = requests.Session()
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
         self.authenticate()
 
     @abstractmethod
@@ -385,7 +387,7 @@ class Search(ABC):
             method=self.method, url=self.endpoint, params=self.query_params, headers=self.headers, json=self.body
         ).prepare()
 
-        r = self.session.send(prepped_req)
+        r = self.session.send(prepped_req, timeout=(REQUESTS_TIMEOUT, REQUESTS_TIMEOUT * 3))
         r.raise_for_status()
 
         self.raw_results = r.json()
@@ -397,9 +399,9 @@ class Search(ABC):
         # returns the first or the most complete
         self.profiles = []
         for r in self.results:
-            normalized_r = {k: unicodedata.normalize("NFKD", v) for k, v in r.items()}
+            normalized_r = {k: unicodedata.normalize("NFKC", v) if isinstance(v, str) else v for k, v in r.items()}
             try:
-                self.profiles.append(LinkedInProfile(**normalized_r, **{"name": name}))
+                self.profiles.append(LinkedInProfile(**normalized_r, name=unicodedata.normalize("NFKC", name)))
             except ValueError as e:
                 log.debug(f"Not a valid {name} {normalized_r} LinkedInprofile: {e}")
 
@@ -486,6 +488,7 @@ class GoogleVertexAI(Search):
         project_id: str,
         datastore_id: str,
         region: str = "global",
+        proxy: str | None = None,
     ):
         self.service_account_info = service_account_info
         self.access_token = None
@@ -498,6 +501,7 @@ class GoogleVertexAI(Search):
             headers={
                 "Content-Type": "application/json",
             },
+            proxy=proxy,
         )
 
     def authenticate(self):
@@ -545,24 +549,31 @@ class GoogleVertexAI(Search):
         return {**self.body, "query": query}
 
     def extract(self):
-        self.results = [
-            {
-                "title": p.get("og:title"),
-                "url": p.get("og:url"),
-                "description": unescape(p.get("og:description")).replace("<br>", "\n"),
-                "givenName": p.get("profile:first_name"),
-                "familyName": p.get("profile:last_name"),
-                "image": p.get("og:image"),
-                "country": ISO3166.get(p.get("locale").split("_")[-1]),
-            }
-            for p in map(
-                lambda r: r.get("document", {})
-                .get("derivedStructData", {})
-                .get("pagemap", {})
-                .get("metatags", [{}])[0],
-                self.raw_results.get("results", []),
+        self.results = []
+        for r in self.raw_results.get("results", []):
+            pagemap = r.get("document", {}).get("derivedStructData", {}).get("pagemap", {}) or {}
+            metatags = pagemap.get("metatags")
+            if not isinstance(metatags, list) or not metatags:
+                metatags = [{}]
+            p = metatags[0]
+            if not isinstance(p, dict):
+                continue
+            url = p.get("og:url")
+            title = p.get("og:title")
+            if not url or not title:
+                continue
+            locale = p.get("locale") or ""
+            self.results.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "description": unescape(p.get("og:description") or "").replace("<br>", "\n"),
+                    "givenName": p.get("profile:first_name"),
+                    "familyName": p.get("profile:last_name"),
+                    "image": p.get("og:image"),
+                    "country": ISO3166.get(locale.split("_")[-1]) if locale else None,
+                }
             )
-        ]
 
 
 class Brave(Search):
@@ -583,9 +594,12 @@ class Brave(Search):
     def __init__(
         self,
         token: str,
+        proxy: str | None = None,
     ):
         self.token = token
-        super().__init__(endpoint=self.ENDPOINT, method="GET", headers=self.HEADERS, query_params=self.QUERY_PARAMS)
+        super().__init__(
+            endpoint=self.ENDPOINT, method="GET", headers=self.HEADERS, query_params=self.QUERY_PARAMS, proxy=proxy
+        )
 
     def authenticate(self):
         self.headers["X-Subscription-Token"] = self.token
@@ -594,11 +608,15 @@ class Brave(Search):
         return {"q": f"site:linkedin.com/in {query}"}
 
     def extract(self):
-        self.results = [
-            {"title": p["title"], "url": p["url"], "description": p["description"]}
-            for p in self.raw_results.get("web", {}).get("results", {})
-            if p
-        ]
+        self.results = []
+        for p in self.raw_results.get("web", {}).get("results", {}) or []:
+            if not p:
+                continue
+            title = p.get("title")
+            url = p.get("url")
+            if not title or not url:
+                continue
+            self.results.append({"title": title, "url": url, "description": p.get("description")})
 
 
 class Bing(Search):
@@ -611,12 +629,14 @@ class Bing(Search):
         self,
         token: str,
         customconfig: str,
+        proxy: str | None = None,
     ):
         self.token = token
         super().__init__(
             endpoint=self.ENDPOINT,
             method="GET",
             query_params=self.QUERY_PARAMS,
+            proxy=proxy,
         )
         self.query_params["customconfig"] = customconfig
 
@@ -632,20 +652,33 @@ class Bing(Search):
             return
 
         for result in self.raw_results["webPages"]["value"]:
+            if not isinstance(result, dict):
+                continue
+            name = result.get("name")
+            snippet = result.get("snippet")
+            url = result.get("url")
+            if not name or not snippet or not url:
+                continue
+
             self.results.append(
                 {
-                    "title": result["name"],
-                    "description": result["snippet"],
-                    "url": result["url"],
-                    "image": result.get("openGraphImage", {}).get("contentUrl"),
+                    "title": name,
+                    "description": snippet,
+                    "url": url,
+                    "image": (result.get("openGraphImage") or {}).get("contentUrl"),
                 }
             )
 
             # Bing also gives you sometimes location
-            for item in result.get("richFacts", ()):
-                if item["hint"]["text"] != "ADDRESS:LOCATIONGENERAL":
+            for item in result.get("richFacts") or ():
+                if not isinstance(item, dict) or not isinstance(item.get("hint"), dict):
                     continue
-                address = item["items"][0]["text"].split(", ")
+                if item["hint"].get("text") != "ADDRESS:LOCATIONGENERAL":
+                    continue
+                items = item.get("items")
+                if not isinstance(items, list) or not items:
+                    continue
+                address = items[0].get("text", "").split(", ")
                 # however sometimes the address isn't correctly identified by Bing
                 if len(address) >= 3:
                     self.results[-1]["workLocation"] = ", ".join(address)
@@ -669,32 +702,33 @@ class SearchChain(metaclass=Singleton):
                     service_account_info=json.loads(open(settings.google_credentials).read()),
                     project_id=settings.google_vertexai_projectid,
                     datastore_id=settings.google_vertexai_datastore,
+                    proxy=settings.proxy,
                 )
             )
         if settings.bing_customconfig and settings.bing_api_key:
-            self.engines.append(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
+            self.engines.append(
+                Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key, proxy=settings.proxy)
+            )
         if settings.brave_api_key:
-            self.engines.append(Brave(token=settings.brave_api_key))
+            self.engines.append(Brave(token=settings.brave_api_key, proxy=settings.proxy))
 
     def search(self, name: str, query: str):
         if not self.engines:
             log.warning("No LinkedIn search engine configured; skipping LinkedIn lookup")
             return None
 
-        success = False
         for engine in self.engines:
             try:
                 log.debug(f"Trying {engine.__class__.__name__}...")
                 engine.search(query=query, name=name)
-                if not engine.results:
-                    success = True
+                if not getattr(engine, "profiles", None):
+                    log.debug(f"{engine.__class__.__name__} returned no valid LinkedIn profile; trying next engine")
                     continue
                 log.debug(f"Search successful with {engine.__class__.__name__}")
                 return engine
             except Exception as e:
                 log.error(f"{engine.__class__.__name__} failed with error: {e}")
 
-        if not success:
-            log.warning("All configured search engines have failed; skipping LinkedIn lookup")
+        log.warning("All configured search engines have failed; skipping LinkedIn lookup")
 
         return None

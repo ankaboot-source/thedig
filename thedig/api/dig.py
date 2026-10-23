@@ -93,8 +93,8 @@ async def linkedin(
     engine = SearchChain(settings).search(query=name, name=name)
     if not engine:
         return
-    if type(worksFor) is set:
-        worksFor = worksFor.copy().pop()
+    if isinstance(worksFor, set):
+        worksFor = next(iter(worksFor), None)
     engine.to_persons(worksFor=worksFor)
     if image and engine.persons:
         for img in image:
@@ -108,7 +108,7 @@ if hasattr(settings, "proxycurl_api_key"):
 
     @ar.register(field="url", insert=("image",))
     async def linkedin_to_image(url: HttpUrl) -> Person:
-        image = linkedin_profile_picture(url, api_key=settings.proxycurl_api_key)
+        image = linkedin_profile_picture(url, api_key=settings.proxycurl_api_key, proxy=settings.proxy)
         if not image:
             return
         return {"image": str(image)}

@@ -5,7 +5,7 @@ from random import choice
 
 import requests
 from loguru import logger as log
-from pydantic import FilePath
+from pydantic import FilePath, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redis.asyncio import Redis
 
@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     https_proxy: str | None = None
     http_proxy: str | None = None
     model_config = SettingsConfigDict(env_file=".env")
+
+    @model_validator(mode="after")
+    def _fallback_proxy(self):
+        if not self.proxy:
+            self.proxy = self.https_proxy or self.http_proxy
+        return self
 
 
 settings = Settings()
