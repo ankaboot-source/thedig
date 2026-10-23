@@ -28,7 +28,8 @@ HttpMethod = Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE",
 
 # linkedin profile url with an ISO3166 country code regular expression
 RE_LINKEDIN_URL = re.compile(
-    r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>([%\w-]+))/?",
+    r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/"
+    r"(?:public\-profile\/in|in|people)\/(?P<identifier>([%\w-]+))/?",
     re.U,
 )
 RE_LINKEDIN_NAME_DESCRIPTION = re.compile(r"<strong>([^<]+)</strong>.*<strong>([^<]+)</strong>", re.U)
@@ -356,6 +357,9 @@ class Search(ABC):
         self.body = body
         self.method = method
         self.proxy = proxy
+        self.raw_results: dict = {}
+        self.results: list = []
+        self.profiles: list = []
         self.session = requests.Session()
         if proxy:
             self.session.proxies = {"http": proxy, "https": proxy}
@@ -481,7 +485,11 @@ class GoogleVertexAI(Search):
     TOKEN_URI = "https://oauth2.googleapis.com/token"
     TOKEN_LIFEDURATION = 3600
     SCOPE = "https://www.googleapis.com/auth/cloud-platform"
-    ENDPOINT = "https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/locations/{region}/collections/default_collection/engines/{datastore_id}/servingConfigs/default_search:search"
+    ENDPOINT = (
+        "https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}"
+        "/locations/{region}/collections/default_collection/engines/{datastore_id}"
+        "/servingConfigs/default_search:search"
+    )
 
     def __init__(
         self,
