@@ -8,3 +8,5 @@ name = "python"
 
   [analyzers.meta]
   runtime_version = "3.x.x"
+  # Match the project's formatter configuration (see pyproject.toml).
+  max_line_length = 120

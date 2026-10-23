@@ -398,10 +398,11 @@ class Search(ABC):
 
         # returns the first or the most complete
         self.profiles = []
+        normalized_name = unicodedata.normalize("NFKC", name)
         for r in self.results:
             normalized_r = {k: unicodedata.normalize("NFKC", v) if isinstance(v, str) else v for k, v in r.items()}
             try:
-                self.profiles.append(LinkedInProfile(**normalized_r, name=unicodedata.normalize("NFKC", name)))
+                self.profiles.append(LinkedInProfile(**normalized_r, name=normalized_name))
             except ValueError as e:
                 log.debug(f"Not a valid {name} {normalized_r} LinkedInprofile: {e}")
 
@@ -598,7 +599,11 @@ class Brave(Search):
     ):
         self.token = token
         super().__init__(
-            endpoint=self.ENDPOINT, method="GET", headers=self.HEADERS, query_params=self.QUERY_PARAMS, proxy=proxy
+            endpoint=self.ENDPOINT,
+            method="GET",
+            headers=self.HEADERS,
+            query_params=self.QUERY_PARAMS,
+            proxy=proxy,
         )
 
     def authenticate(self):
@@ -646,42 +651,50 @@ class Bing(Search):
     def search_query(self, query: str) -> dict:
         return {"q": query}
 
+    @staticmethod
+    def _result_from_web_page(result: dict) -> dict | None:
+        if not isinstance(result, dict):
+            return None
+        name = result.get("name")
+        snippet = result.get("snippet")
+        url = result.get("url")
+        if not name or not snippet or not url:
+            return None
+        return {
+            "title": name,
+            "description": snippet,
+            "url": url,
+            "image": (result.get("openGraphImage") or {}).get("contentUrl"),
+        }
+
+    @staticmethod
+    def _location_from_rich_facts(result: dict) -> str | None:
+        # Bing also gives you sometimes location
+        for item in result.get("richFacts") or ():
+            if not isinstance(item, dict) or not isinstance(item.get("hint"), dict):
+                continue
+            if item["hint"].get("text") != "ADDRESS:LOCATIONGENERAL":
+                continue
+            items = item.get("items")
+            if not isinstance(items, list) or not items:
+                continue
+            address = items[0].get("text", "").split(", ")
+            # however sometimes the address isn't correctly identified by Bing
+            if len(address) >= 3:
+                return ", ".join(address)
+        return None
+
     def extract(self):
         self.results = []
-        if "webPages" not in self.raw_results or not self.raw_results["webPages"].get("value"):
-            return
-
-        for result in self.raw_results["webPages"]["value"]:
-            if not isinstance(result, dict):
+        web_pages = self.raw_results.get("webPages") or {}
+        for result in web_pages.get("value") or ():
+            parsed = self._result_from_web_page(result)
+            if not parsed:
                 continue
-            name = result.get("name")
-            snippet = result.get("snippet")
-            url = result.get("url")
-            if not name or not snippet or not url:
-                continue
-
-            self.results.append(
-                {
-                    "title": name,
-                    "description": snippet,
-                    "url": url,
-                    "image": (result.get("openGraphImage") or {}).get("contentUrl"),
-                }
-            )
-
-            # Bing also gives you sometimes location
-            for item in result.get("richFacts") or ():
-                if not isinstance(item, dict) or not isinstance(item.get("hint"), dict):
-                    continue
-                if item["hint"].get("text") != "ADDRESS:LOCATIONGENERAL":
-                    continue
-                items = item.get("items")
-                if not isinstance(items, list) or not items:
-                    continue
-                address = items[0].get("text", "").split(", ")
-                # however sometimes the address isn't correctly identified by Bing
-                if len(address) >= 3:
-                    self.results[-1]["workLocation"] = ", ".join(address)
+            location = self._location_from_rich_facts(result)
+            if location:
+                parsed["workLocation"] = location
+            self.results.append(parsed)
 
 
 class Singleton(type):
@@ -707,7 +720,11 @@ class SearchChain(metaclass=Singleton):
             )
         if settings.bing_customconfig and settings.bing_api_key:
             self.engines.append(
-                Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key, proxy=settings.proxy)
+                Bing(
+                    customconfig=settings.bing_customconfig,
+                    token=settings.bing_api_key,
+                    proxy=settings.proxy,
+                )
             )
         if settings.brave_api_key:
             self.engines.append(Brave(token=settings.brave_api_key, proxy=settings.proxy))
@@ -722,7 +739,8 @@ class SearchChain(metaclass=Singleton):
                 log.debug(f"Trying {engine.__class__.__name__}...")
                 engine.search(query=query, name=name)
                 if not getattr(engine, "profiles", None):
-                    log.debug(f"{engine.__class__.__name__} returned no valid LinkedIn profile; trying next engine")
+                    engine_name = engine.__class__.__name__
+                    log.debug(f"{engine_name} has no valid profile; trying next")
                     continue
                 log.debug(f"Search successful with {engine.__class__.__name__}")
                 return engine

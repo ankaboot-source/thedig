@@ -8,7 +8,6 @@ with a no-op ``raw_search``) and handcrafted payloads are injected directly.
 # (thedig.api.person -> thedig.api.dig -> thedig.excavators.linkedin).
 import pytest
 
-import thedig.api.dig  # noqa: F401
 from thedig.api import dig
 from thedig.excavators.linkedin import (
     Bing,
@@ -32,6 +31,7 @@ class _StubSearch(Search):
 
     def __init__(self, results):
         self._results = results
+        super().__init__(endpoint="https://example.test", method="GET")
 
     def search_query(self, _query: str = None) -> dict:  # noqa: RUF013
         return {}
@@ -40,10 +40,10 @@ class _StubSearch(Search):
         self.results = self._results
 
     def authenticate(self):
-        pass
+        return self.headers
 
-    def raw_search(self, query: str):
-        pass
+    def raw_search(self, _query: str):
+        self.raw_results = {}
 
 
 class _StubEngine:
@@ -53,8 +53,8 @@ class _StubEngine:
         self.profiles = profiles
         self.results = results if results is not None else [{"url": TARGET_URL}]
 
-    def search(self, query: str, name: str):
-        pass
+    def search(self, query: str, name: str):  # noqa: ARG002
+        return self.profiles
 
 
 def test_search_ignores_none_values_from_bing_shaped_results():

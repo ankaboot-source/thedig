@@ -149,6 +149,7 @@ if settings.google_credentials:
             return {"OptOut": True}
 
         return snm.person
+
 else:
     log.error("No Google Credentials, no reverse-image search!")
 
