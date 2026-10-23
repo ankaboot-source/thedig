@@ -120,6 +120,46 @@ class Archeologist:
         # we don't excavate again with the same excavator, the same field/value
         # so we keep an history of what field/value was used for what excavator
 
+    @staticmethod
+    def _person_key(person: dict) -> str:
+        return sha256(person["email"].encode("utf-8")).hexdigest()
+
+    async def _cached_person(self, person: dict) -> dict | None:
+        if not self.cache:
+            return None
+        person_c = await self.cache.get(self._person_key(person))
+        if not person_c:
+            return None
+        log.debug(f"cache hit for {person['email']}")
+        return json.loads(person_c)
+
+    async def _store_person(self, person: dict) -> None:
+        if not self.cache:
+            return
+        await self.cache.set(
+            self._person_key(person),
+            json.dumps(jsonable_encoder(person)),
+            ex=self.cache_expiration,
+        )
+
+    async def _excavate_field(self, field: str, person: dict, exc: dict) -> tuple[set, bool]:
+        upgraded = set()
+        enriched = False
+        for excavator in self.excavators[field]:
+            endpoint = excavator["endpoint"]
+            # do not excavate twice the same field/value with the same excavator
+            if (field, person[field]) in exc[endpoint]:
+                log.error(f"{endpoint} already exc {field} with value {person[field]}")
+                continue
+
+            exc[endpoint].append((field, person[field]))
+
+            excavator_f = ExcavatorField(excavator, field, person)
+            field_upgraded = await excavator_f.excavate()
+            upgraded.update(field_upgraded)
+            enriched |= excavator["enrich"] if field_upgraded else False
+        return upgraded, enriched
+
     async def person(self, person: dict) -> tuple[bool, bool, dict]:
         """Transmute one person
 
@@ -129,13 +169,11 @@ class Archeologist:
         Returns:
             bool, bool, dict: succeed or not, enrich or not, enriched person
         """
-        if self.cache:
-            person_c = await self.cache.get(sha256(person["email"].encode("utf-8")).hexdigest())
-            if person_c:
-                log.debug(f"cache hit for {person['email']}")
-                return True, None, json.loads(person_c)
+        cached = await self._cached_person(person)
+        if cached is not None:
+            return True, None, cached
 
-        fields = list(person.keys() & self.fields)
+        fields = [field for field in self._ordered_elements if field in person]
         exc: dict = defaultdict(list)
 
         log.debug(f"excavating {fields} for {person}")
@@ -150,33 +188,18 @@ class Archeologist:
                 log.debug(f"no excavator for {field}")
                 continue
 
-            upgraded = set()
-            for excavator in self.excavators[field]:
-                # do not excavate twice the same field/value with the same excavator
-                if (field, person[field]) in exc[excavator["endpoint"]]:
-                    log.error(f"{excavator['endpoint']} already exc {field} with value {person[field]}")
-                    continue
-
-                exc[excavator["endpoint"]].append((field, person[field]))
-
-                excavator_f = ExcavatorField(excavator, field, person)
-                upgraded.update(await excavator_f.excavate())
-                enriched |= excavator["enrich"] if upgraded else False
-
-            modified = True if upgraded else modified
+            upgraded, field_enriched = await self._excavate_field(field, person, exc)
+            modified = modified or bool(upgraded)
+            enriched = enriched or field_enriched
 
             # eligibility to excavate
             to_excavate = upgraded & self.fields
-            if upgraded and to_excavate:
+            if to_excavate:
                 fields.extend(to_excavate)
                 log.debug(f"new fields to excavate: {to_excavate}")
 
-        if self.cache and modified:
-            await self.cache.set(
-                sha256(person["email"].encode("utf-8")).hexdigest(),
-                json.dumps(jsonable_encoder(person)),
-                ex=self.cache_expiration,
-            )
+        if modified:
+            await self._store_person(person)
 
         return modified, enriched, (person if modified else {})
 

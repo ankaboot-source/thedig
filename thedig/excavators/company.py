@@ -54,6 +54,23 @@ def _proxy_server(proxy) -> str | None:
     return proxy
 
 
+def _playwright_proxy(proxy) -> dict | None:
+    server = _proxy_server(proxy)
+    if not server:
+        return None
+    if "://" not in server:
+        server = f"http://{server}"
+    parsed = urllib.parse.urlsplit(server)
+    host = parsed.hostname or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    playwright_proxy = {"server": f"{parsed.scheme}://{host}"}
+    if parsed.username is not None:
+        playwright_proxy["username"] = urllib.parse.unquote(parsed.username)
+        playwright_proxy["password"] = urllib.parse.unquote(parsed.password or "")
+    return playwright_proxy
+
+
 def _detect_patchright_chrome_path() -> str | None:
     override_path = os.getenv("THEDIG_PATCHRIGHT_CHROME_PATH")
     if override_path:
@@ -111,9 +128,9 @@ async def _browser_fetch(url: str, proxy=None) -> WebResponse | None:
         "headless": os.getenv("THEDIG_PATCHRIGHT_HEADLESS", "false").lower() in {"1", "true", "yes"},
         "no_viewport": True,
     }
-    proxy_server = _proxy_server(proxy)
-    if proxy_server:
-        launch_kwargs["proxy"] = {"server": proxy_server}
+    playwright_proxy = _playwright_proxy(proxy)
+    if playwright_proxy:
+        launch_kwargs["proxy"] = playwright_proxy
 
     executable_path = _detect_patchright_chrome_path()
     if executable_path:
