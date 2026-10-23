@@ -17,12 +17,12 @@ from thedig.excavators.linkedin import (
     SearchChain,
 )
 
-TARGET_URL = "https://fr.linkedin.com/in/fanny-kamer-0b119742"
-TARGET_TITLE = "Fanny Kamer - Senior Manager Consulting Business Operationnel - EPSILON France | LinkedIn"
+TARGET_URL = "https://fr.linkedin.com/in/jane-doe-0b119742"
+TARGET_TITLE = "Jane Doe - Senior Manager Consulting Business Operationnel - Acme France | LinkedIn"
 TARGET_DESCRIPTION = (
-    "Consultante · Expérience : EPSILON France · Formation : EM Lyon · "
+    "Consultante · Expérience : Acme France · Formation : Université de Paris · "
     "Lieu : Paris, Île-de-France, France · 500+ relations sur LinkedIn. "
-    "Consultez le profil de Fanny Kamer sur LinkedIn, une communauté professionnelle d’un milliard de membres"  # noqa: RUF001
+    "Consultez le profil de Jane Doe sur LinkedIn, une communauté professionnelle d’un milliard de membres"  # noqa: RUF001
 )
 
 
@@ -61,7 +61,7 @@ def test_search_ignores_none_values_from_bing_shaped_results():
     """A None value (Bing sets image=None) must not abort the whole engine."""
     results = [
         {
-            "title": "Fanny Kamer - EPSILON France",
+            "title": "Jane Doe - Acme France",
             "url": TARGET_URL,
             "description": TARGET_DESCRIPTION,
             "image": None,
@@ -73,14 +73,14 @@ def test_search_ignores_none_values_from_bing_shaped_results():
             "image": None,
         },
         {
-            "title": "Fanny Kamer - Autre poste - Autre société | LinkedIn",
-            "url": "https://fr.linkedin.com/in/fanny-kamer-0b119742",
+            "title": "Jane Doe - Autre poste - Autre société | LinkedIn",
+            "url": "https://fr.linkedin.com/in/jane-doe-0b119742",
             "description": None,
             "image": None,
         },
     ]
 
-    profiles = _StubSearch(results).search(query="Fanny Kamer", name="Fanny Kamer")
+    profiles = _StubSearch(results).search(query="Jane Doe", name="Jane Doe")
 
     assert len(profiles) >= 1
     assert str(profiles[0].url).startswith(TARGET_URL)
@@ -96,10 +96,10 @@ def test_search_preserves_french_accents_with_nfkc():
                 "image": None,
             }
         ]
-    ).search(query="Fanny Kamer", name="Fanny Kamer")[0]
+    ).search(query="Jane Doe", name="Jane Doe")[0]
 
     assert profile.jobTitle == "Senior Manager Consulting Business Operationnel"
-    assert profile.worksFor == "EPSILON France"
+    assert profile.worksFor == "Acme France"
     assert profile.workLocation == "Paris, Île-de-France, France"
     assert "Île-de-France" in profile.workLocation
 
@@ -110,15 +110,15 @@ def test_two_part_title_takes_company_from_description():
     profile = _StubSearch(
         [
             {
-                "title": "Fanny Kamer - Consultante | LinkedIn",
+                "title": "Jane Doe - Consultante | LinkedIn",
                 "url": TARGET_URL,
                 "description": TARGET_DESCRIPTION,
                 "image": None,
             }
         ]
-    ).search(query="Fanny Kamer", name="Fanny Kamer")[0]
+    ).search(query="Jane Doe", name="Jane Doe")[0]
 
-    assert profile.worksFor == "EPSILON France"
+    assert profile.worksFor == "Acme France"
     assert profile.workLocation == "Paris, Île-de-France, France"
     # The current title parser does not derive a jobTitle from 2-part titles
     # and the description parser only extracts worksFor/workLocation, so this
@@ -133,7 +133,7 @@ def test_search_chain_falls_through_when_no_valid_profile():
     chain = SearchChain.__new__(SearchChain)
     chain.engines = [first, second]
 
-    assert chain.search(name="Fanny Kamer", query="Fanny Kamer") is second
+    assert chain.search(name="Jane Doe", query="Jane Doe") is second
 
 
 def test_brave_extract_skips_malformed_rows():
@@ -167,7 +167,7 @@ def test_bing_extract_skips_malformed_rows_and_rich_facts():
                 {"name": "No snippet", "url": TARGET_URL},
                 {"name": "No url", "snippet": "x"},
                 {
-                    "name": "Fanny Kamer - EPSILON France | LinkedIn",
+                    "name": "Jane Doe - Acme France | LinkedIn",
                     "snippet": TARGET_DESCRIPTION,
                     "url": TARGET_URL,
                     "openGraphImage": None,
@@ -229,9 +229,9 @@ def test_google_vertexai_extract_skips_malformed_rows():
 @pytest.mark.asyncio
 async def test_dig_linkedin_returns_url_and_worksfor(monkeypatch):
     expected_person = {
-        "name": "Fanny Kamer",
+        "name": "Jane Doe",
         "url": TARGET_URL,
-        "worksFor": ["EPSILON France"],
+        "worksFor": ["Acme France"],
     }
 
     class _FakeEngine:
@@ -253,10 +253,10 @@ async def test_dig_linkedin_returns_url_and_worksfor(monkeypatch):
 
     monkeypatch.setattr(dig, "SearchChain", _FakeChain)
 
-    person = await dig.linkedin("Fanny Kamer")
+    person = await dig.linkedin("Jane Doe")
 
     assert person["url"] == TARGET_URL
-    assert person["worksFor"] == ["EPSILON France"]
+    assert person["worksFor"] == ["Acme France"]
 
 
 @pytest.mark.asyncio
@@ -269,7 +269,7 @@ async def test_dig_linkedin_handles_empty_worksfor_set(monkeypatch):
 
         def to_persons(self, worksFor=None):  # noqa: N803
             received["worksFor"] = worksFor
-            self.persons = [{"name": "Fanny Kamer", "url": TARGET_URL}]
+            self.persons = [{"name": "Jane Doe", "url": TARGET_URL}]
             return self.persons
 
     engine = _FakeEngine()
@@ -283,7 +283,7 @@ async def test_dig_linkedin_handles_empty_worksfor_set(monkeypatch):
 
     monkeypatch.setattr(dig, "SearchChain", _FakeChain)
 
-    person = await dig.linkedin("Fanny Kamer", worksFor=set())
+    person = await dig.linkedin("Jane Doe", worksFor=set())
 
     assert received["worksFor"] is None
     assert person["url"] == TARGET_URL
